@@ -1,5 +1,5 @@
 --[[
-    Omar Hub v31
+    Omar Hub v32 — v20 base + silent aim fixed
     Credit: Made by Omar
     For use ONLY in your own Roblox game.
 --]]
@@ -11,57 +11,53 @@ local Workspace        = game:GetService("Workspace")
 local Camera           = Workspace.CurrentCamera
 local LocalPlayer      = Players.LocalPlayer
 
-local function log(m) pcall(function() print("[OmarHub] " .. m) end) end
-log("=== Starting v31 ===")
-
 -- ============ CONFIG ============
 local Config = {
     ESP = {
-        Enabled = true, ShowName = true, ShowDistance = true,
-        ShowHealth = true, ShowBox = true, TeamCheck = false,
+        Enabled      = true,
+        ShowName     = true,
+        ShowDistance = true,
+        ShowHealth   = true,
+        ShowBox      = true,
+        TeamCheck    = false,
+        MaxBoxPixels = 1200,
     },
     Aimbot = {
-        Enabled = false, FOV = 150, TargetPart = "Head", TeamCheck = false,
-        MaxDist = 1000, Smoothness = 100, LockMode = "Hold Mouse", WallCheck = false,
+        Enabled    = false,
+        FOV        = 150,
+        TargetPart = "Head",
+        TeamCheck  = false,
+        MaxDist    = 1000,
+        Smoothness = 100,
+        LockMode   = "Hold Mouse",
+        WallCheck  = false,
     },
     SilentAim = {
-        Enabled = false, FOV = 220, TargetPart = "Head", TeamCheck = false,
-        HitChance = 100,
+        Enabled    = false,
+        FOV        = 220,
+        TargetPart = "Head",
+        TeamCheck  = false,
+        HitChance  = 100,
     },
     ToggleKey = Enum.KeyCode.RightShift,
 }
 
+-- ============ STATE ============
 local connections = {}
-local function track(c)
-    if c then table.insert(connections, c) end
-    return c
-end
-local function safeConnect(signal, fn)
-    local ok, conn = pcall(function() return signal:Connect(fn) end)
-    if ok and conn then
-        table.insert(connections, conn)
-        return conn
-    end
-    log("Failed to connect a signal")
-    return nil
-end
-local mouseHeld = false
+local function track(c) table.insert(connections, c); return c end
 
 -- ============ UI ============
-local ScreenGui
-pcall(function()
-    ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "OmarHub"
-    ScreenGui.ResetOnSpawn = false
-    ScreenGui.IgnoreGuiInset = true
-    ScreenGui.DisplayOrder = 999
-    ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-end)
-log("ScreenGui created")
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "OmarHub"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.IgnoreGuiInset = true
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.DisplayOrder = 999
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local Main = Instance.new("Frame")
-Main.Size = UDim2.new(0, 260, 0, 380)
-Main.Position = UDim2.new(0.5, -130, 0.5, -190)
+Main.Size = UDim2.new(0, 260, 0, 360)
+Main.Position = UDim2.new(0.5, -130, 0.5, -180)
 Main.BackgroundColor3 = Color3.fromRGB(15, 10, 20)
 Main.BorderSizePixel = 0
 Main.Active = false
@@ -71,6 +67,7 @@ Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 10)
 local Stroke = Instance.new("UIStroke", Main)
 Stroke.Color = Color3.fromRGB(140, 60, 220)
 Stroke.Thickness = 1.5
+Stroke.Transparency = 0.15
 
 local TitleBar = Instance.new("Frame")
 TitleBar.Size = UDim2.new(1, 0, 0, 34)
@@ -79,9 +76,17 @@ TitleBar.BorderSizePixel = 0
 TitleBar.Parent = Main
 Instance.new("UICorner", TitleBar).CornerRadius = UDim.new(0, 10)
 
+local DragHandle = Instance.new("Frame")
+DragHandle.Size = UDim2.new(0, 60, 0, 4)
+DragHandle.Position = UDim2.new(0.5, -30, 0, 4)
+DragHandle.BackgroundColor3 = Color3.fromRGB(150, 90, 230)
+DragHandle.BorderSizePixel = 0
+DragHandle.Parent = TitleBar
+Instance.new("UICorner", DragHandle).CornerRadius = UDim.new(1, 0)
+
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, -110, 1, 0)
-Title.Position = UDim2.new(0, 12, 0, 0)
+Title.Position = UDim2.new(0, 12, 0, 6)
 Title.BackgroundTransparency = 1
 Title.Text = "Omar Hub"
 Title.TextColor3 = Color3.fromRGB(200, 130, 255)
@@ -90,57 +95,82 @@ Title.TextSize = 14
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Parent = TitleBar
 
+local BtnRow = Instance.new("Frame")
+BtnRow.Size = UDim2.new(0, 54, 0, 24)
+BtnRow.Position = UDim2.new(1, -60, 0.5, -12)
+BtnRow.BackgroundTransparency = 1
+BtnRow.Parent = TitleBar
+
 local ToggleBtn = Instance.new("TextButton")
 ToggleBtn.Size = UDim2.new(0, 24, 0, 24)
-ToggleBtn.Position = UDim2.new(1, -60, 0, 5)
 ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 25, 70)
 ToggleBtn.Text = "–"
 ToggleBtn.TextColor3 = Color3.fromRGB(220, 180, 255)
 ToggleBtn.Font = Enum.Font.GothamBold
 ToggleBtn.TextSize = 15
 ToggleBtn.BorderSizePixel = 0
-ToggleBtn.Parent = TitleBar
+ToggleBtn.Parent = BtnRow
 Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(0, 6)
 
 local CloseBtn = Instance.new("TextButton")
 CloseBtn.Size = UDim2.new(0, 24, 0, 24)
-CloseBtn.Position = UDim2.new(1, -30, 0, 5)
+CloseBtn.Position = UDim2.new(0, 30, 0, 0)
 CloseBtn.BackgroundColor3 = Color3.fromRGB(70, 20, 40)
 CloseBtn.Text = "X"
 CloseBtn.TextColor3 = Color3.fromRGB(255, 150, 180)
 CloseBtn.Font = Enum.Font.GothamBold
 CloseBtn.TextSize = 13
 CloseBtn.BorderSizePixel = 0
-CloseBtn.Parent = TitleBar
+CloseBtn.Parent = BtnRow
 Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
 
--- Drag main panel
+-- OMAR pill
+local FloatPill = Instance.new("TextButton")
+FloatPill.Size = UDim2.new(0, 72, 0, 28)
+FloatPill.Position = UDim2.new(0, 14, 1, -80)
+FloatPill.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+FloatPill.Text = "OMAR"
+FloatPill.TextColor3 = Color3.fromRGB(180, 100, 240)
+FloatPill.Font = Enum.Font.GothamBold
+FloatPill.TextSize = 12
+FloatPill.BorderSizePixel = 0
+FloatPill.AutoButtonColor = false
+FloatPill.Active = true
+FloatPill.ZIndex = 500
+FloatPill.Visible = false
+FloatPill.Parent = ScreenGui
+Instance.new("UICorner", FloatPill).CornerRadius = UDim.new(0, 6)
+local PillStroke = Instance.new("UIStroke", FloatPill)
+PillStroke.Color = Color3.fromRGB(150, 70, 220)
+PillStroke.Thickness = 1.5
+
+-- Drag main
 do
     local dragging, dragStart, startPos = false, nil, nil
-    safeConnect(TitleBar.InputBegan, function(input)
+    track(TitleBar.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1
         or input.UserInputType == Enum.UserInputType.Touch then
             dragging, dragStart, startPos = true, input.Position, Main.Position
         end
-    end)
+    end))
     local function move(input)
         if not dragging then return end
         local d = input.Position - dragStart
         Main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X,
                                   startPos.Y.Scale, startPos.Y.Offset + d.Y)
     end
-    safeConnect(TitleBar.InputChanged, function(i)
+    track(TitleBar.InputChanged:Connect(function(i)
         if i.UserInputType == Enum.UserInputType.MouseMovement
         or i.UserInputType == Enum.UserInputType.Touch then move(i) end
-    end)
-    safeConnect(UserInputService.InputChanged, function(i)
+    end))
+    track(UserInputService.InputChanged:Connect(function(i)
         if i.UserInputType == Enum.UserInputType.MouseMovement
         or i.UserInputType == Enum.UserInputType.Touch then move(i) end
-    end)
-    safeConnect(UserInputService.InputEnded, function(i)
+    end))
+    track(UserInputService.InputEnded:Connect(function(i)
         if i.UserInputType == Enum.UserInputType.MouseButton1
         or i.UserInputType == Enum.UserInputType.Touch then dragging = false end
-    end)
+    end))
 end
 
 -- Tabs
@@ -216,9 +246,9 @@ local function setActiveTab(which)
     end
 end
 setActiveTab("aim")
-safeConnect(AimTabBtn.MouseButton1Click, function() setActiveTab("aim") end)
-safeConnect(SilentTabBtn.MouseButton1Click, function() setActiveTab("silent") end)
-safeConnect(EspTabBtn.MouseButton1Click, function() setActiveTab("esp") end)
+track(AimTabBtn.MouseButton1Click:Connect(function() setActiveTab("aim") end))
+track(SilentTabBtn.MouseButton1Click:Connect(function() setActiveTab("silent") end))
+track(EspTabBtn.MouseButton1Click:Connect(function() setActiveTab("esp") end))
 
 -- ============ WIDGETS ============
 local function makeToggle(parent, text, yPos, default, callback)
@@ -255,12 +285,12 @@ local function makeToggle(parent, text, yPos, default, callback)
     Instance.new("UICorner", Knob).CornerRadius = UDim.new(1, 0)
 
     local state = default
-    safeConnect(Btn.MouseButton1Click, function()
+    track(Btn.MouseButton1Click:Connect(function()
         state = not state
         Pill.BackgroundColor3 = state and Color3.fromRGB(150, 70, 220) or Color3.fromRGB(60, 40, 80)
         Knob.Position = state and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
-        pcall(callback, state)
-    end)
+        callback(state)
+    end))
     return Btn
 end
 
@@ -298,15 +328,15 @@ local function makeSwitch(parent, text, yPos, options, default, callback)
         b.Font = Enum.Font.GothamBold; b.TextSize = 11
         b.BorderSizePixel = 0; b.Parent = Container
         Instance.new("UICorner", b).CornerRadius = UDim.new(0, 4)
-        safeConnect(b.MouseButton1Click, function()
+        track(b.MouseButton1Click:Connect(function()
             for _, other in ipairs(Container:GetChildren()) do
                 if other:IsA("TextButton") then
                     other.BackgroundColor3 = Color3.fromRGB(50, 30, 70)
                 end
             end
             b.BackgroundColor3 = Color3.fromRGB(150, 70, 220)
-            pcall(callback, opt)
-        end)
+            callback(opt)
+        end))
     end
     return Frame
 end
@@ -340,24 +370,24 @@ local function makeSlider(parent, text, yPos, min, max, default, callback)
     Instance.new("UICorner", Fill).CornerRadius = UDim.new(0, 7)
 
     local dragging = false
-    safeConnect(Bar.InputBegan, function(i)
+    track(Bar.InputBegan:Connect(function(i)
         if i.UserInputType == Enum.UserInputType.MouseButton1
         or i.UserInputType == Enum.UserInputType.Touch then dragging = true end
-    end)
-    safeConnect(UserInputService.InputEnded, function(i)
+    end))
+    track(UserInputService.InputEnded:Connect(function(i)
         if i.UserInputType == Enum.UserInputType.MouseButton1
         or i.UserInputType == Enum.UserInputType.Touch then dragging = false end
-    end)
-    safeConnect(UserInputService.InputChanged, function(i)
+    end))
+    track(UserInputService.InputChanged:Connect(function(i)
         if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement
         or i.UserInputType == Enum.UserInputType.Touch) then
             local rel = math.clamp((i.Position.X - Bar.AbsolutePosition.X) / Bar.AbsoluteSize.X, 0, 1)
             Fill.Size = UDim2.new(rel, 0, 1, 0)
             local val = math.floor(min + (max - min) * rel)
             Lbl.Text = text .. ": " .. val
-            pcall(callback, val)
+            callback(val)
         end
-    end)
+    end))
     return Frame
 end
 
@@ -397,7 +427,6 @@ Credit.Text = "Made by Omar"
 Credit.TextColor3 = Color3.fromRGB(180, 100, 240)
 Credit.Font = Enum.Font.GothamBold; Credit.TextSize = 12
 Credit.Parent = Main
-log("UI built")
 
 -- ============ FOV RINGS ============
 local FovRing = Instance.new("Frame")
@@ -411,6 +440,7 @@ Instance.new("UICorner", FovRing).CornerRadius = UDim.new(1, 0)
 local FovStroke = Instance.new("UIStroke", FovRing)
 FovStroke.Color = Color3.fromRGB(190, 110, 255)
 FovStroke.Thickness = 2.5
+FovStroke.Transparency = 0.1
 
 local SilentRing = Instance.new("Frame")
 SilentRing.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -423,66 +453,7 @@ Instance.new("UICorner", SilentRing).CornerRadius = UDim.new(1, 0)
 local SilentStroke = Instance.new("UIStroke", SilentRing)
 SilentStroke.Color = Color3.fromRGB(120, 220, 255)
 SilentStroke.Thickness = 2
-log("Rings built")
-
--- ============ OMAR PILL ============
-local FloatPill = Instance.new("TextButton")
-FloatPill.Size = UDim2.new(0, 72, 0, 28)
-FloatPill.Position = UDim2.new(0, 14, 1, -80)
-FloatPill.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-FloatPill.Text = "OMAR"
-FloatPill.TextColor3 = Color3.fromRGB(180, 100, 240)
-FloatPill.Font = Enum.Font.GothamBold
-FloatPill.TextSize = 12
-FloatPill.BorderSizePixel = 0
-FloatPill.AutoButtonColor = false
-FloatPill.ZIndex = 500
-FloatPill.Visible = false
-FloatPill.Parent = ScreenGui
-Instance.new("UICorner", FloatPill).CornerRadius = UDim.new(0, 6)
-local PillStroke = Instance.new("UIStroke", FloatPill)
-PillStroke.Color = Color3.fromRGB(150, 70, 220)
-PillStroke.Thickness = 1.5
-
-do
-    local dragging, moved, dragStart, startPos = false, false, nil, nil
-    local function clamp(pos)
-        local vp = Camera.ViewportSize
-        local size = FloatPill.AbsoluteSize
-        local w = size.X > 0 and size.X or FloatPill.Size.X.Offset
-        local h = size.Y > 0 and size.Y or FloatPill.Size.Y.Offset
-        return UDim2.new(0, math.clamp(pos.X.Offset, 0, vp.X - w),
-                         0, math.clamp(pos.Y.Offset, 0, vp.Y - h))
-    end
-    safeConnect(FloatPill.InputBegan, function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1
-        or input.UserInputType == Enum.UserInputType.Touch then
-            dragging, moved, dragStart, startPos = true, false, input.Position, FloatPill.Position
-        end
-    end)
-    safeConnect(UserInputService.InputChanged, function(input)
-        if not dragging then return end
-        if input.UserInputType == Enum.UserInputType.MouseMovement
-        or input.UserInputType == Enum.UserInputType.Touch then
-            local d = input.Position - dragStart
-            if math.abs(d.X) > 3 or math.abs(d.Y) > 3 then moved = true end
-            FloatPill.Position = clamp(UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X,
-                                                 startPos.Y.Scale, startPos.Y.Offset + d.Y))
-        end
-    end)
-    safeConnect(UserInputService.InputEnded, function(input)
-        if not dragging then return end
-        if input.UserInputType == Enum.UserInputType.MouseButton1
-        or input.UserInputType == Enum.UserInputType.Touch then
-            if not moved then
-                Main.Visible = true
-                FloatPill.Visible = false
-            end
-            dragging, moved = false, false
-        end
-    end)
-end
-log("Pill built")
+SilentStroke.Transparency = 0.1
 
 -- ============ HELPERS ============
 local function isTeammate(player, teamCheckOn)
@@ -539,87 +510,82 @@ local function getCharTargets(teamCheckOn)
     end
     return out
 end
-log("Helpers ready")
 
--- ============ ESP (Highlight + Billboard) ============
+-- ============ ESP ============
 local espObjects = {}
 
-local function createNativeESP(character)
+local function createESP(character)
     if espObjects[character] then return end
-    local ok, err = pcall(function()
-        local hl = Instance.new("Highlight")
-        hl.Name = "OmarHL"
-        hl.FillColor = Color3.fromRGB(120, 50, 200)
-        hl.FillTransparency = 0.7
-        hl.OutlineColor = Color3.fromRGB(200, 130, 255)
-        hl.OutlineTransparency = 0
-        hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-        hl.Adornee = character
-        hl.Parent = ScreenGui
+    local hl = Instance.new("Highlight")
+    hl.Name = "OmarHL"
+    hl.FillColor = Color3.fromRGB(120, 50, 200)
+    hl.FillTransparency = 0.7
+    hl.OutlineColor = Color3.fromRGB(200, 130, 255)
+    hl.OutlineTransparency = 0
+    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    hl.Adornee = character
+    hl.Parent = ScreenGui
 
-        local bb = Instance.new("BillboardGui")
-        bb.Name = "OmarBB"
-        bb.Size = UDim2.new(0, 200, 0, 44)
-        bb.StudsOffset = Vector3.new(0, 3, 0)
-        bb.AlwaysOnTop = true
-        bb.Adornee = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
-        bb.Parent = ScreenGui
+    local bb = Instance.new("BillboardGui")
+    bb.Size = UDim2.new(0, 220, 0, 56)
+    bb.StudsOffset = Vector3.new(0, 3, 0)
+    bb.AlwaysOnTop = true
+    bb.Adornee = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
+    bb.Parent = ScreenGui
 
-        local nameLbl = Instance.new("TextLabel")
-        nameLbl.Size = UDim2.new(1, 0, 0, 20)
-        nameLbl.BackgroundTransparency = 1
-        nameLbl.TextColor3 = Color3.fromRGB(230, 200, 255)
-        nameLbl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-        nameLbl.TextStrokeTransparency = 0
-        nameLbl.Font = Enum.Font.GothamBold
-        nameLbl.TextSize = 14
-        nameLbl.Text = ""
-        nameLbl.Parent = bb
+    local nameLbl = Instance.new("TextLabel")
+    nameLbl.Size = UDim2.new(1, 0, 0, 20)
+    nameLbl.BackgroundTransparency = 1
+    nameLbl.TextColor3 = Color3.fromRGB(230, 200, 255)
+    nameLbl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    nameLbl.TextStrokeTransparency = 0
+    nameLbl.Font = Enum.Font.GothamBold
+    nameLbl.TextSize = 14
+    nameLbl.Text = ""
+    nameLbl.Parent = bb
 
-        local distLbl = Instance.new("TextLabel")
-        distLbl.Size = UDim2.new(1, 0, 0, 16)
-        distLbl.Position = UDim2.new(0, 0, 0, 20)
-        distLbl.BackgroundTransparency = 1
-        distLbl.TextColor3 = Color3.fromRGB(200, 140, 255)
-        distLbl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-        distLbl.TextStrokeTransparency = 0
-        distLbl.Font = Enum.Font.Gotham
-        distLbl.TextSize = 12
-        distLbl.Text = ""
-        distLbl.Parent = bb
+    local distLbl = Instance.new("TextLabel")
+    distLbl.Size = UDim2.new(1, 0, 0, 16)
+    distLbl.Position = UDim2.new(0, 0, 0, 20)
+    distLbl.BackgroundTransparency = 1
+    distLbl.TextColor3 = Color3.fromRGB(200, 140, 255)
+    distLbl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    distLbl.TextStrokeTransparency = 0
+    distLbl.Font = Enum.Font.Gotham
+    distLbl.TextSize = 12
+    distLbl.Text = ""
+    distLbl.Parent = bb
 
-        local hpBB = Instance.new("BillboardGui")
-        hpBB.Size = UDim2.new(0, 40, 0, 4)
-        hpBB.StudsOffset = Vector3.new(0, 2.5, 0)
-        hpBB.AlwaysOnTop = true
-        hpBB.Adornee = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
-        hpBB.Parent = ScreenGui
+    local hpBB = Instance.new("BillboardGui")
+    hpBB.Size = UDim2.new(0, 44, 0, 5)
+    hpBB.StudsOffset = Vector3.new(0, 2.5, 0)
+    hpBB.AlwaysOnTop = true
+    hpBB.Adornee = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
+    hpBB.Parent = ScreenGui
 
-        local hpBg = Instance.new("Frame")
-        hpBg.Size = UDim2.new(1, 2, 1, 2)
-        hpBg.Position = UDim2.new(0, -1, 0, -1)
-        hpBg.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-        hpBg.BorderSizePixel = 0
-        hpBg.Parent = hpBB
-        Instance.new("UICorner", hpBg).CornerRadius = UDim.new(0, 2)
+    local hpBg = Instance.new("Frame")
+    hpBg.Size = UDim2.new(1, 2, 1, 2)
+    hpBg.Position = UDim2.new(0, -1, 0, -1)
+    hpBg.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    hpBg.BorderSizePixel = 0
+    hpBg.Parent = hpBB
+    Instance.new("UICorner", hpBg).CornerRadius = UDim.new(0, 2)
 
-        local hpFill = Instance.new("Frame")
-        hpFill.Size = UDim2.new(1, 0, 1, 0)
-        hpFill.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
-        hpFill.BorderSizePixel = 0
-        hpFill.Parent = hpBg
-        Instance.new("UICorner", hpFill).CornerRadius = UDim.new(0, 2)
+    local hpFill = Instance.new("Frame")
+    hpFill.Size = UDim2.new(1, 0, 1, 0)
+    hpFill.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+    hpFill.BorderSizePixel = 0
+    hpFill.Parent = hpBg
+    Instance.new("UICorner", hpFill).CornerRadius = UDim.new(0, 2)
 
-        espObjects[character] = {
-            hl = hl, bb = bb, hpBB = hpBB,
-            nameLbl = nameLbl, distLbl = distLbl,
-            hpFill = hpFill, hpBg = hpBg,
-        }
-    end)
-    if not ok then log("createESP error: " .. tostring(err)) end
+    espObjects[character] = {
+        hl = hl, bb = bb, hpBB = hpBB,
+        nameLbl = nameLbl, distLbl = distLbl,
+        hpFill = hpFill, hpBg = hpBg,
+    }
 end
 
-local function removeNativeESP(character)
+local function removeESP(character)
     local d = espObjects[character]
     if not d then return end
     for _, obj in pairs(d) do
@@ -628,34 +594,106 @@ local function removeNativeESP(character)
     espObjects[character] = nil
 end
 
-pcall(function()
-    safeConnect(Workspace.DescendantRemoving, function(obj)
-        if espObjects[obj] then removeNativeESP(obj) end
-    end)
-end)
-pcall(function()
-    safeConnect(Players.PlayerRemoving, function(p)
-        if p.Character then removeNativeESP(p.Character) end
-    end)
-end)
-log("ESP system ready")
+track(Workspace.DescendantRemoving:Connect(function(obj)
+    if espObjects[obj] then removeESP(obj) end
+end))
+track(Players.PlayerRemoving:Connect(function(p)
+    if p.Character then removeESP(p.Character) end
+end))
+
+track(RunService.RenderStepped:Connect(function()
+    -- FOV rings
+    if Config.Aimbot.Enabled then
+        local r = Config.Aimbot.FOV
+        FovRing.Size = UDim2.new(0, r * 2, 0, r * 2)
+        FovRing.Position = UDim2.new(0.5, 0, 0.5, 0)
+        FovRing.Visible = true
+    else
+        FovRing.Visible = false
+    end
+
+    if Config.SilentAim.Enabled then
+        local r = Config.SilentAim.FOV
+        SilentRing.Size = UDim2.new(0, r * 2, 0, r * 2)
+        SilentRing.Position = UDim2.new(0.5, 0, 0.5, 0)
+        SilentRing.Visible = true
+    else
+        SilentRing.Visible = false
+    end
+
+    -- ESP
+    if not Config.ESP.Enabled then
+        for _, d in pairs(espObjects) do
+            if d.hl then d.hl.Enabled = false end
+            if d.bb then d.bb.Enabled = false end
+            if d.hpBB then d.hpBB.Enabled = false end
+        end
+        return
+    end
+
+    local live = {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p == LocalPlayer then continue end
+        if isTeammate(p, Config.ESP.TeamCheck) then continue end
+        if not isAlive(p) then continue end
+        local char = p.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if char and hum and hrp then
+            live[char] = true
+            if not espObjects[char] then createESP(char) end
+            local d = espObjects[char]
+            d.hl.Enabled = Config.ESP.ShowBox
+            d.bb.Enabled = Config.ESP.ShowName or Config.ESP.ShowDistance
+            d.hpBB.Enabled = Config.ESP.ShowHealth
+
+            local name = (p.DisplayName ~= "" and p.DisplayName) or p.Name
+            d.nameLbl.Visible = Config.ESP.ShowName
+            if Config.ESP.ShowName then d.nameLbl.Text = name end
+
+            d.distLbl.Visible = Config.ESP.ShowDistance
+            if Config.ESP.ShowDistance then
+                local dist = math.floor((Camera.CFrame.Position - hrp.Position).Magnitude)
+                d.distLbl.Text = string.format("[%d studs]", dist)
+            end
+
+            if Config.ESP.ShowHealth then
+                local hpPct = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+                d.hpFill.Size = UDim2.new(hpPct, 0, 1, 0)
+                d.hpFill.BackgroundColor3 = Color3.fromRGB(
+                    math.floor(255 * (1 - hpPct)),
+                    math.floor(255 * hpPct),
+                    0
+                )
+            end
+        end
+    end
+    for char, d in pairs(espObjects) do
+        if not live[char] then
+            if d.hl then d.hl.Enabled = false end
+            if d.bb then d.bb.Enabled = false end
+            if d.hpBB then d.hpBB.Enabled = false end
+        end
+    end
+end))
 
 -- ============ MOUSE STATE ============
-safeConnect(UserInputService.InputBegan, function(input, gp)
+local mouseHeld = false
+track(UserInputService.InputBegan:Connect(function(input, gp)
     if gp then return end
     if input.UserInputType == Enum.UserInputType.MouseButton1
     or input.UserInputType == Enum.UserInputType.MouseButton2
     or input.UserInputType == Enum.UserInputType.Touch then
         mouseHeld = true
     end
-end)
-safeConnect(UserInputService.InputEnded, function(input)
+end))
+track(UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1
     or input.UserInputType == Enum.UserInputType.MouseButton2
     or input.UserInputType == Enum.UserInputType.Touch then
         mouseHeld = false
     end
-end)
+end))
 
 -- ============ AIMBOT ============
 local function findAimbotTarget()
@@ -690,15 +728,6 @@ end
 
 local function aimStep()
     if Config.Aimbot.Enabled then
-        local r = Config.Aimbot.FOV
-        FovRing.Size = UDim2.new(0, r * 2, 0, r * 2)
-        FovRing.Position = UDim2.new(0.5, 0, 0.5, 0)
-        FovRing.Visible = true
-    else
-        FovRing.Visible = false
-    end
-
-    if Config.Aimbot.Enabled then
         if Config.Aimbot.LockMode ~= "Hold Mouse" or mouseHeld then
             local target = findAimbotTarget()
             if target then
@@ -711,32 +740,38 @@ local function aimStep()
     end
 end
 
-pcall(function()
-    RunService:BindToRenderStep("OmarHubAimbot", Enum.RenderPriority.Camera.Value + 1, aimStep)
-    log("Aimbot bound")
-end)
+RunService:BindToRenderStep("OmarHubAimbot", Enum.RenderPriority.Camera.Value + 1, aimStep)
 
--- ============ SILENT AIM ============
+track(RunService.Stepped:Connect(function()
+    if Config.Aimbot.Enabled then return end
+    local char = LocalPlayer.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if hum and not hum.AutoRotate then hum.AutoRotate = true end
+end))
+
+-- ============ SILENT AIM (installed LAST, wrapped in pcall) ============
+local originalRaycast, originalRaycastAll
 local silentFiring = false
 local silentTapUntil = 0
-local function silentTrigger() silentTapUntil = tick() + 0.2 end
 
-safeConnect(UserInputService.InputBegan, function(input, gp)
+track(UserInputService.InputBegan:Connect(function(input, gp)
     if gp then return end
     if input.UserInputType == Enum.UserInputType.MouseButton1
     or input.UserInputType == Enum.UserInputType.Touch then
         silentFiring = true
-        silentTrigger()
+        silentTapUntil = tick() + 0.2
     end
-end)
-safeConnect(UserInputService.InputEnded, function(input)
+end))
+track(UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1
     or input.UserInputType == Enum.UserInputType.Touch then
         silentFiring = false
     end
-end)
+end))
 
-local function isFiringNow() return silentFiring or tick() < silentTapUntil end
+local function isFiringNow()
+    return silentFiring or tick() < silentTapUntil
+end
 
 local function findSilentTarget()
     local vp = Camera.ViewportSize
@@ -764,7 +799,6 @@ local function findSilentTarget()
     return best
 end
 
-local originalRaycast, originalRaycastAll
 pcall(function()
     originalRaycast    = Workspace.Raycast
     originalRaycastAll = Workspace.RaycastAll
@@ -805,98 +839,6 @@ pcall(function()
         end
         return originalRaycastAll(self, origin, direction, params)
     end
-    log("Silent aim installed")
-end)
-
--- ============ RENDER LOOPS ============
-pcall(function()
-    safeConnect(RunService.RenderStepped, function()
-        -- FOV rings
-        if Config.Aimbot.Enabled then
-            local r = Config.Aimbot.FOV
-            FovRing.Size = UDim2.new(0, r * 2, 0, r * 2)
-            FovRing.Position = UDim2.new(0.5, 0, 0.5, 0)
-            FovRing.Visible = true
-        else
-            FovRing.Visible = false
-        end
-
-        if Config.SilentAim.Enabled then
-            local r = Config.SilentAim.FOV
-            SilentRing.Size = UDim2.new(0, r * 2, 0, r * 2)
-            SilentRing.Position = UDim2.new(0.5, 0, 0.5, 0)
-            SilentRing.Visible = true
-        else
-            SilentRing.Visible = false
-        end
-
-        -- ESP
-        if not Config.ESP.Enabled then
-            for _, d in pairs(espObjects) do
-                if d.hl then d.hl.Enabled = false end
-                if d.bb then d.bb.Enabled = false end
-                if d.hpBB then d.hpBB.Enabled = false end
-            end
-        else
-            local live = {}
-            for _, p in ipairs(Players:GetPlayers()) do
-                if p == LocalPlayer then continue end
-                if isTeammate(p, Config.ESP.TeamCheck) then continue end
-                if not isAlive(p) then continue end
-                local char = p.Character
-                local hum = char and char:FindFirstChildOfClass("Humanoid")
-                local hrp = char and char:FindFirstChild("HumanoidRootPart")
-                if char and hum and hrp then
-                    live[char] = true
-                    if not espObjects[char] then createNativeESP(char) end
-                    local d = espObjects[char]
-                    if d then
-                        d.hl.Enabled = Config.ESP.ShowBox
-                        d.bb.Enabled = Config.ESP.ShowName or Config.ESP.ShowDistance
-                        d.hpBB.Enabled = Config.ESP.ShowHealth
-
-                        local name = (p.DisplayName ~= "" and p.DisplayName) or p.Name
-                        d.nameLbl.Visible = Config.ESP.ShowName
-                        if Config.ESP.ShowName then d.nameLbl.Text = name end
-
-                        d.distLbl.Visible = Config.ESP.ShowDistance
-                        if Config.ESP.ShowDistance then
-                            local dist = math.floor((Camera.CFrame.Position - hrp.Position).Magnitude)
-                            d.distLbl.Text = string.format("[%d studs]", dist)
-                        end
-
-                        if Config.ESP.ShowHealth then
-                            local hpPct = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
-                            d.hpFill.Size = UDim2.new(hpPct, 0, 1, 0)
-                            d.hpFill.BackgroundColor3 = Color3.fromRGB(
-                                math.floor(255 * (1 - hpPct)),
-                                math.floor(255 * hpPct),
-                                0
-                            )
-                        end
-                    end
-                end
-            end
-            for char, d in pairs(espObjects) do
-                if not live[char] then
-                    if d.hl then d.hl.Enabled = false end
-                    if d.bb then d.bb.Enabled = false end
-                    if d.hpBB then d.hpBB.Enabled = false end
-                end
-            end
-        end
-    end)
-    log("Render loop bound")
-end)
-
--- Restore autorotate
-pcall(function()
-    safeConnect(RunService.Stepped, function()
-        if Config.Aimbot.Enabled then return end
-        local char = LocalPlayer.Character
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-        if hum and not hum.AutoRotate then hum.AutoRotate = true end
-    end)
 end)
 
 -- ============ TOGGLE / CLOSE ============
@@ -905,20 +847,55 @@ local function setUIVisible(vis)
     FloatPill.Visible = not vis
 end
 
-safeConnect(ToggleBtn.MouseButton1Click, function()
-    log("Hide clicked")
+track(ToggleBtn.MouseButton1Click:Connect(function()
     setUIVisible(false)
-end)
+end))
 
-safeConnect(UserInputService.InputBegan, function(input, gp)
+-- OMAR pill drag + tap
+do
+    local dragging, moved, dragStart, startPos = false, false, nil, nil
+    local function clamp(pos)
+        local vp = Camera.ViewportSize
+        local size = FloatPill.AbsoluteSize
+        local w = size.X > 0 and size.X or FloatPill.Size.X.Offset
+        local h = size.Y > 0 and size.Y or FloatPill.Size.Y.Offset
+        return UDim2.new(0, math.clamp(pos.X.Offset, 0, vp.X - w),
+                         0, math.clamp(pos.Y.Offset, 0, vp.Y - h))
+    end
+    track(FloatPill.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+            dragging, moved, dragStart, startPos = true, false, input.Position, FloatPill.Position
+        end
+    end))
+    track(UserInputService.InputChanged:Connect(function(input)
+        if not dragging then return end
+        if input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch then
+            local d = input.Position - dragStart
+            if math.abs(d.X) > 3 or math.abs(d.Y) > 3 then moved = true end
+            FloatPill.Position = clamp(UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X,
+                                                 startPos.Y.Scale, startPos.Y.Offset + d.Y))
+        end
+    end))
+    track(UserInputService.InputEnded:Connect(function(input)
+        if not dragging then return end
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+            if not moved then setUIVisible(true) end
+            dragging, moved = false, false
+        end
+    end))
+end
+
+track(UserInputService.InputBegan:Connect(function(input, gp)
     if gp then return end
     if input.KeyCode == Config.ToggleKey then
         setUIVisible(not Main.Visible)
     end
-end)
+end))
 
 local function shutdown()
-    log("Shutting down")
     pcall(function() RunService:UnbindFromRenderStep("OmarHubAimbot") end)
     if originalRaycast then
         pcall(function() Workspace.Raycast = originalRaycast end)
@@ -938,6 +915,4 @@ local function shutdown()
     pcall(function() ScreenGui:Destroy() end)
 end
 
-safeConnect(CloseBtn.MouseButton1Click, shutdown)
-
-log("=== Loaded successfully ===")
+track(CloseBtn.MouseButton1Click:Connect(shutdown))
