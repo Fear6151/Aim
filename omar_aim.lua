@@ -1,1466 +1,651 @@
---[[
-    PURPLE AIM + ESP
-    Roblox Studio Edition
 
-    Crate by, Omar
-
-    Place this LocalScript in:
-    StarterPlayer > StarterPlayerScripts
-]]
+--==================================================
+-- OMAR AIM ASSIST + ESP
+-- Created by: Omar
+-- For your own Roblox Studio game
+--==================================================
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local LocalPlayer = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
-------------------------------------------------------------
+--==================================================
 -- SETTINGS
-------------------------------------------------------------
+--==================================================
 
-local Settings = {
+local AIM_ENABLED = false
+local ESP_ENABLED = false
+local TEAM_CHECK = true
 
-    -- AIM
-    AimEnabled = false,
-    Smoothness = 75,
-    FOV = 180,
-    TargetPart = "Head",
+local SMOOTHNESS = 10
+local TARGET_PART = "Head"
 
-    TeamCheck = true,
-    HoldToAim = false,
-    IgnoreDead = true,
+local currentTarget = nil
+local highlights = {}
 
-    -- Add teams that should never be targeted.
-    ExcludedTeams = {
-        -- ["Lobby"] = true,
-        -- ["Spectators"] = true,
-    },
+local running = true
+local connections = {}
 
-    -- ESP
-    ESPEnabled = false,
-
-    ESP = {
-        Box = true,
-        Name = true,
-        Distance = true,
-        Health = true,
-    }
-}
-
-------------------------------------------------------------
+--==================================================
 -- COLORS
-------------------------------------------------------------
+--==================================================
 
-local Colors = {
-    Background = Color3.fromRGB(9, 7, 13),
-    Panel = Color3.fromRGB(17, 13, 25),
-    Button = Color3.fromRGB(25, 19, 36),
+local BLACK = Color3.fromRGB(17, 17, 22)
+local PANEL = Color3.fromRGB(27, 27, 35)
+local PURPLE = Color3.fromRGB(165, 95, 255)
+local WHITE = Color3.fromRGB(245, 245, 250)
+local GRAY = Color3.fromRGB(155, 155, 170)
 
-    Purple = Color3.fromRGB(145, 70, 255),
-    PurpleDark = Color3.fromRGB(80, 35, 150),
+--==================================================
+-- CONNECTION MANAGEMENT
+--==================================================
 
-    White = Color3.fromRGB(245, 245, 250),
-    Gray = Color3.fromRGB(155, 150, 165),
-
-    Red = Color3.fromRGB(215, 55, 65),
-}
-
-------------------------------------------------------------
--- STATE
-------------------------------------------------------------
-
-local CurrentTarget = nil
-local RMBDown = false
-local MenuOpen = true
-
-local ESPObjects = {}
-
-------------------------------------------------------------
--- SCREEN GUI
-------------------------------------------------------------
-
-local Gui = Instance.new("ScreenGui")
-Gui.Name = "PurpleAimESP"
-Gui.ResetOnSpawn = false
-Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-Gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-
-------------------------------------------------------------
--- FOV CIRCLE
-------------------------------------------------------------
-
-local FOVCircle = Instance.new("Frame")
-
-FOVCircle.Name = "FOVCircle"
-FOVCircle.AnchorPoint = Vector2.new(0.5, 0.5)
-FOVCircle.Position = UDim2.fromScale(0.5, 0.5)
-
-FOVCircle.Size = UDim2.fromOffset(
-    Settings.FOV * 2,
-    Settings.FOV * 2
-)
-
-FOVCircle.BackgroundTransparency = 1
-FOVCircle.Visible = false
-FOVCircle.Parent = Gui
-
-local FOVCorner = Instance.new("UICorner")
-FOVCorner.CornerRadius = UDim.new(1, 0)
-FOVCorner.Parent = FOVCircle
-
-local FOVStroke = Instance.new("UIStroke")
-FOVStroke.Color = Colors.Purple
-FOVStroke.Thickness = 2
-FOVStroke.Transparency = 0.15
-FOVStroke.Parent = FOVCircle
-
-------------------------------------------------------------
--- MAIN WINDOW
-------------------------------------------------------------
-
-local Main = Instance.new("Frame")
-
-Main.Name = "Main"
-Main.Size = UDim2.fromOffset(350, 470)
-Main.Position = UDim2.fromOffset(25, 160)
-
-Main.BackgroundColor3 = Colors.Background
-Main.BorderSizePixel = 0
-
-Main.Parent = Gui
-
-local MainCorner = Instance.new("UICorner")
-MainCorner.CornerRadius = UDim.new(0, 14)
-MainCorner.Parent = Main
-
-local MainStroke = Instance.new("UIStroke")
-MainStroke.Color = Colors.PurpleDark
-MainStroke.Thickness = 1
-MainStroke.Parent = Main
-
-------------------------------------------------------------
--- TITLE BAR
-------------------------------------------------------------
-
-local TitleBar = Instance.new("Frame")
-
-TitleBar.Size = UDim2.new(1, 0, 0, 48)
-TitleBar.BackgroundColor3 = Colors.Panel
-TitleBar.BorderSizePixel = 0
-
-TitleBar.Parent = Main
-
-local TitleCorner = Instance.new("UICorner")
-TitleCorner.CornerRadius = UDim.new(0, 14)
-TitleCorner.Parent = TitleBar
-
-local Title = Instance.new("TextLabel")
-
-Title.BackgroundTransparency = 1
-Title.Position = UDim2.fromOffset(15, 0)
-Title.Size = UDim2.new(1, -100, 1, 0)
-
-Title.Text = "PURPLE  •  AIM + ESP"
-Title.TextColor3 = Colors.White
-Title.TextSize = 16
-Title.Font = Enum.Font.GothamBold
-Title.TextXAlignment = Enum.TextXAlignment.Left
-
-Title.Parent = TitleBar
-
-------------------------------------------------------------
--- CLOSE BUTTON
-------------------------------------------------------------
-
-local Close = Instance.new("TextButton")
-
-Close.Size = UDim2.fromOffset(32, 30)
-Close.Position = UDim2.new(1, -40, 0, 9)
-
-Close.BackgroundColor3 = Colors.Red
-Close.Text = "×"
-
-Close.TextColor3 = Colors.White
-Close.TextSize = 20
-Close.Font = Enum.Font.GothamBold
-
-Close.Parent = TitleBar
-
-local CloseCorner = Instance.new("UICorner")
-CloseCorner.CornerRadius = UDim.new(0, 8)
-CloseCorner.Parent = Close
-
-------------------------------------------------------------
--- CONTENT
-------------------------------------------------------------
-
-local Content = Instance.new("Frame")
-
-Content.Position = UDim2.fromOffset(12, 58)
-Content.Size = UDim2.new(1, -24, 1, -70)
-
-Content.BackgroundTransparency = 1
-Content.Parent = Main
-
-local Layout = Instance.new("UIListLayout")
-
-Layout.Padding = UDim.new(0, 7)
-Layout.SortOrder = Enum.SortOrder.LayoutOrder
-
-Layout.Parent = Content
-
-------------------------------------------------------------
--- BUTTON CREATOR
-------------------------------------------------------------
-
-local function CreateButton(Text)
-
-    local Button = Instance.new("TextButton")
-
-    Button.Size = UDim2.new(1, 0, 0, 37)
-
-    Button.BackgroundColor3 = Colors.Button
-    Button.BorderSizePixel = 0
-
-    Button.Text = Text
-    Button.TextColor3 = Colors.White
-    Button.TextSize = 13
-    Button.Font = Enum.Font.GothamMedium
-
-    Button.AutoButtonColor = false
-
-    Button.Parent = Content
-
-    local Corner = Instance.new("UICorner")
-    Corner.CornerRadius = UDim.new(0, 8)
-    Corner.Parent = Button
-
-    local Stroke = Instance.new("UIStroke")
-
-    Stroke.Color = Colors.White
-    Stroke.Thickness = 1
-    Stroke.Transparency = 0.45
-
-    Stroke.Parent = Button
-
-    return Button, Stroke
+local function track(connection)
+    table.insert(connections, connection)
+    return connection
 end
 
-------------------------------------------------------------
--- BUTTON ACTIVE STYLE
-------------------------------------------------------------
-
-local function SetButtonState(
-    Button,
-    Stroke,
-    Active
-)
-
-    if Active then
-
-        Button.BackgroundColor3 =
-            Colors.Purple
-
-        Stroke.Color =
-            Colors.White
-
-        Stroke.Transparency = 0
-
-    else
-
-        Button.BackgroundColor3 =
-            Colors.Button
-
-        Stroke.Color =
-            Colors.White
-
-        Stroke.Transparency = 0.45
-    end
-end
-
-------------------------------------------------------------
--- AIMBOT
-------------------------------------------------------------
-
-local AimButton, AimStroke =
-    CreateButton("AIMBOT  •  OFF")
-
-AimButton.MouseButton1Click:Connect(
-    function()
-
-        Settings.AimEnabled =
-            not Settings.AimEnabled
-
-        if not Settings.AimEnabled then
-            CurrentTarget = nil
-        end
-
-        AimButton.Text =
-            "AIMBOT  •  " ..
-            (
-                Settings.AimEnabled
-                and "ON"
-                or "OFF"
-            )
-
-        SetButtonState(
-            AimButton,
-            AimStroke,
-            Settings.AimEnabled
-        )
-    end
-)
-
-------------------------------------------------------------
--- SMOOTHNESS
-------------------------------------------------------------
-
-local SmoothButton =
-    CreateButton("Smoothness  •  75%")
-
-SmoothButton.MouseButton1Click:Connect(
-    function()
-
-        Settings.Smoothness += 10
-
-        if Settings.Smoothness > 100 then
-            Settings.Smoothness = 0
-        end
-
-        SmoothButton.Text =
-            "Smoothness  •  " ..
-            Settings.Smoothness .. "%"
-    end
-)
-
-------------------------------------------------------------
--- FOV SIZE
-------------------------------------------------------------
-
-local FOVButton =
-    CreateButton("Aim FOV  •  180")
-
-FOVButton.MouseButton1Click:Connect(
-    function()
-
-        Settings.FOV += 30
-
-        if Settings.FOV > 500 then
-            Settings.FOV = 60
-        end
-
-        FOVButton.Text =
-            "Aim FOV  •  " ..
-            Settings.FOV
-
-        FOVCircle.Size =
-            UDim2.fromOffset(
-                Settings.FOV * 2,
-                Settings.FOV * 2
-            )
-    end
-)
-
-------------------------------------------------------------
--- FOV CIRCLE
-------------------------------------------------------------
-
-local FOVToggle, FOVToggleStroke =
-    CreateButton("FOV Circle  •  OFF")
-
-FOVToggle.MouseButton1Click:Connect(
-    function()
-
-        FOVCircle.Visible =
-            not FOVCircle.Visible
-
-        FOVToggle.Text =
-            "FOV Circle  •  " ..
-            (
-                FOVCircle.Visible
-                and "ON"
-                or "OFF"
-            )
-
-        SetButtonState(
-            FOVToggle,
-            FOVToggleStroke,
-            FOVCircle.Visible
-        )
-    end
-)
-
-------------------------------------------------------------
--- TARGET PART
-------------------------------------------------------------
-
-local TargetButton =
-    CreateButton("Target Part  •  HEAD")
-
-TargetButton.MouseButton1Click:Connect(
-    function()
-
-        if Settings.TargetPart == "Head" then
-
-            Settings.TargetPart =
-                "HumanoidRootPart"
-
-        else
-
-            Settings.TargetPart =
-                "Head"
-        end
-
-        TargetButton.Text =
-            "Target Part  •  " ..
-            string.upper(
-                Settings.TargetPart
-            )
-
-        CurrentTarget = nil
-    end
-)
-
-------------------------------------------------------------
--- TEAM CHECK
-------------------------------------------------------------
-
-local TeamButton, TeamStroke =
-    CreateButton("Team Check  •  ON")
-
-TeamButton.MouseButton1Click:Connect(
-    function()
-
-        Settings.TeamCheck =
-            not Settings.TeamCheck
-
-        TeamButton.Text =
-            "Team Check  •  " ..
-            (
-                Settings.TeamCheck
-                and "ON"
-                or "OFF"
-            )
-
-        SetButtonState(
-            TeamButton,
-            TeamStroke,
-            Settings.TeamCheck
-        )
-
-        CurrentTarget = nil
-    end
-)
-
-------------------------------------------------------------
--- HOLD RMB
-------------------------------------------------------------
-
-local HoldButton, HoldStroke =
-    CreateButton("Hold RMB  •  OFF")
-
-HoldButton.MouseButton1Click:Connect(
-    function()
-
-        Settings.HoldToAim =
-            not Settings.HoldToAim
-
-        HoldButton.Text =
-            "Hold RMB  •  " ..
-            (
-                Settings.HoldToAim
-                and "ON"
-                or "OFF"
-            )
-
-        SetButtonState(
-            HoldButton,
-            HoldStroke,
-            Settings.HoldToAim
-        )
-
-        CurrentTarget = nil
-    end
-)
-
-------------------------------------------------------------
--- ESP MAIN TOGGLE
-------------------------------------------------------------
-
-local ESPButton, ESPStroke =
-    CreateButton("ESP  •  OFF")
-
-ESPButton.MouseButton1Click:Connect(
-    function()
-
-        Settings.ESPEnabled =
-            not Settings.ESPEnabled
-
-        ESPButton.Text =
-            "ESP  •  " ..
-            (
-                Settings.ESPEnabled
-                and "ON"
-                or "OFF"
-            )
-
-        SetButtonState(
-            ESPButton,
-            ESPStroke,
-            Settings.ESPEnabled
-        )
-    end
-)
-
-------------------------------------------------------------
--- ESP BOX
-------------------------------------------------------------
-
-local BoxButton, BoxStroke =
-    CreateButton("ESP Box  •  ON")
-
-BoxButton.MouseButton1Click:Connect(
-    function()
-
-        Settings.ESP.Box =
-            not Settings.ESP.Box
-
-        BoxButton.Text =
-            "ESP Box  •  " ..
-            (
-                Settings.ESP.Box
-                and "ON"
-                or "OFF"
-            )
-
-        SetButtonState(
-            BoxButton,
-            BoxStroke,
-            Settings.ESP.Box
-        )
-    end
-)
-
-------------------------------------------------------------
--- ESP NAME + DISTANCE
-------------------------------------------------------------
-
-local NameButton, NameStroke =
-    CreateButton(
-        "ESP Name + Distance  •  ON"
-    )
-
-NameButton.MouseButton1Click:Connect(
-    function()
-
-        local NewState =
-            not Settings.ESP.Name
-
-        Settings.ESP.Name =
-            NewState
-
-        Settings.ESP.Distance =
-            NewState
-
-        NameButton.Text =
-            "ESP Name + Distance  •  " ..
-            (
-                NewState
-                and "ON"
-                or "OFF"
-            )
-
-        SetButtonState(
-            NameButton,
-            NameStroke,
-            NewState
-        )
-    end
-)
-
-------------------------------------------------------------
--- ESP HEALTH
-------------------------------------------------------------
-
-local HealthButton, HealthStroke =
-    CreateButton("ESP Health  •  ON")
-
-HealthButton.MouseButton1Click:Connect(
-    function()
-
-        Settings.ESP.Health =
-            not Settings.ESP.Health
-
-        HealthButton.Text =
-            "ESP Health  •  " ..
-            (
-                Settings.ESP.Health
-                and "ON"
-                or "OFF"
-            )
-
-        SetButtonState(
-            HealthButton,
-            HealthStroke,
-            Settings.ESP.Health
-        )
-    end
-)
-
-------------------------------------------------------------
--- CREDIT
-------------------------------------------------------------
-
-local Credit = Instance.new("TextLabel")
-
-Credit.Size =
-    UDim2.new(1, 0, 0, 25)
-
-Credit.BackgroundTransparency = 1
-
-Credit.Text = "Crate by, Omar"
-
-Credit.TextColor3 =
-    Colors.Gray
-
-Credit.TextSize = 11
-Credit.Font = Enum.Font.GothamMedium
-
-Credit.Parent = Content
-
-------------------------------------------------------------
--- TARGET VALIDATION
-------------------------------------------------------------
-
-local function IsValidTarget(Player)
-
-    if Player == LocalPlayer then
+--==================================================
+-- PLAYER VALIDATION
+--==================================================
+
+local function isEnemy(player)
+    if player == LocalPlayer then
         return false
     end
 
-    --------------------------------------------------------
-    -- TEAM CHECK
-    --------------------------------------------------------
-
-    if Settings.TeamCheck then
-
-        if Player.Team == LocalPlayer.Team then
-            return false
-        end
+    if not TEAM_CHECK then
+        return true
     end
 
-    --------------------------------------------------------
-    -- EXCLUDED TEAMS
-    --------------------------------------------------------
-
-    if Player.Team then
-
-        if Settings.ExcludedTeams[
-            Player.Team.Name
-        ] then
-
-            return false
-        end
-    end
-
-    --------------------------------------------------------
-    -- CHARACTER
-    --------------------------------------------------------
-
-    local Character =
-        Player.Character
-
-    if not Character then
-        return false
-    end
-
-    --------------------------------------------------------
-    -- HUMANOID
-    --------------------------------------------------------
-
-    local Humanoid =
-        Character:FindFirstChildOfClass(
-            "Humanoid"
-        )
-
-    if not Humanoid then
-        return false
-    end
-
-    if Settings.IgnoreDead
-        and Humanoid.Health <= 0 then
-
-        return false
-    end
-
-    --------------------------------------------------------
-    -- TARGET PART
-    --------------------------------------------------------
-
-    if not Character:FindFirstChild(
-        Settings.TargetPart
-    ) then
-
+    if LocalPlayer.Team ~= nil
+        and player.Team == LocalPlayer.Team then
         return false
     end
 
     return true
 end
 
-------------------------------------------------------------
--- FIND CLOSEST TARGET
-------------------------------------------------------------
+local function getTargetPart(player)
+    local character = player.Character
 
-local function GetClosestTarget()
+    if not character then
+        return nil
+    end
 
-    local MousePosition =
-        UserInputService:GetMouseLocation()
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
 
-    local Closest = nil
-    local ClosestDistance =
-        Settings.FOV
+    if not humanoid or humanoid.Health <= 0 then
+        return nil
+    end
 
-    for _, Player in ipairs(
-        Players:GetPlayers()
-    ) do
+    if TARGET_PART == "Head" then
+        return character:FindFirstChild("Head")
+    end
 
-        if IsValidTarget(Player) then
+    return character:FindFirstChild("UpperTorso")
+        or character:FindFirstChild("Torso")
+        or character:FindFirstChild("HumanoidRootPart")
+end
 
-            local Character =
-                Player.Character
+local function isValidTarget(player)
+    if not player or not player.Parent then
+        return false
+    end
 
-            local Part =
-                Character:FindFirstChild(
-                    Settings.TargetPart
-                )
+    if not isEnemy(player) then
+        return false
+    end
 
-            if Part then
+    return getTargetPart(player) ~= nil
+end
 
-                local ScreenPosition, Visible =
-                    Camera:WorldToViewportPoint(
-                        Part.Position
-                    )
+--==================================================
+-- GUI CREATION
+--==================================================
 
-                if Visible
-                    and ScreenPosition.Z > 0 then
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "OmarAimAssist"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.IgnoreGuiInset = true
+ScreenGui.Parent = PlayerGui
 
-                    local Distance =
-                        (
-                            Vector2.new(
-                                ScreenPosition.X,
-                                ScreenPosition.Y
-                            )
-                            - MousePosition
-                        ).Magnitude
+local Main = Instance.new("Frame")
+Main.Name = "Main"
+Main.Size = UDim2.fromOffset(300, 365)
+Main.Position = UDim2.new(0.5, -150, 0.5, -182)
+Main.BackgroundColor3 = BLACK
+Main.BorderSizePixel = 0
+Main.Parent = ScreenGui
 
-                    if Distance <
-                        ClosestDistance then
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 12)
+MainCorner.Parent = Main
 
-                        ClosestDistance =
-                            Distance
+local MainStroke = Instance.new("UIStroke")
+MainStroke.Color = PURPLE
+MainStroke.Thickness = 1.5
+MainStroke.Parent = Main
 
-                        Closest = Player
+--==================================================
+-- DRAGGABLE HEADER
+--==================================================
+
+local Header = Instance.new("Frame")
+Header.Size = UDim2.new(1, 0, 0, 65)
+Header.BackgroundColor3 = PANEL
+Header.BorderSizePixel = 0
+Header.Parent = Main
+
+local HeaderCorner = Instance.new("UICorner")
+HeaderCorner.CornerRadius = UDim.new(0, 12)
+HeaderCorner.Parent = Header
+
+local HeaderTitle = Instance.new("TextLabel")
+HeaderTitle.Size = UDim2.new(1, -65, 0, 30)
+HeaderTitle.Position = UDim2.fromOffset(15, 9)
+HeaderTitle.BackgroundTransparency = 1
+HeaderTitle.Text = "OMAR ASSIST"
+HeaderTitle.TextColor3 = WHITE
+HeaderTitle.Font = Enum.Font.GothamBold
+HeaderTitle.TextSize = 18
+HeaderTitle.TextXAlignment = Enum.TextXAlignment.Left
+HeaderTitle.Parent = Header
+
+local HeaderSubtitle = Instance.new("TextLabel")
+HeaderSubtitle.Size = UDim2.new(1, -65, 0, 17)
+HeaderSubtitle.Position = UDim2.fromOffset(16, 36)
+HeaderSubtitle.BackgroundTransparency = 1
+HeaderSubtitle.Text = "AIM  /  VISUALS"
+HeaderSubtitle.TextColor3 = PURPLE
+HeaderSubtitle.Font = Enum.Font.GothamMedium
+HeaderSubtitle.TextSize = 10
+HeaderSubtitle.TextXAlignment = Enum.TextXAlignment.Left
+HeaderSubtitle.Parent = Header
+
+local CloseButton = Instance.new("TextButton")
+CloseButton.Size = UDim2.fromOffset(32, 32)
+CloseButton.Position = UDim2.new(1, -44, 0, 16)
+CloseButton.BackgroundColor3 = PANEL
+CloseButton.Text = "×"
+CloseButton.TextColor3 = WHITE
+CloseButton.TextSize = 23
+CloseButton.Font = Enum.Font.Gotham
+CloseButton.AutoButtonColor = true
+CloseButton.Parent = Header
+
+Instance.new("UICorner", CloseButton).CornerRadius = UDim.new(0, 8)
+
+local CloseStroke = Instance.new("UIStroke")
+CloseStroke.Color = WHITE
+CloseStroke.Thickness = 1
+CloseStroke.Parent = CloseButton
+
+--==================================================
+-- DRAG SUPPORT: MOUSE + TOUCH
+--==================================================
+
+local dragging = false
+local dragStart
+local startPosition
+local dragInput
+
+Header.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+
+        dragging = true
+        dragStart = input.Position
+        startPosition = Main.Position
+
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+Header.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and input == dragInput then
+        local delta = input.Position - dragStart
+
+        Main.Position = UDim2.new(
+            startPosition.X.Scale,
+            startPosition.X.Offset + delta.X,
+            startPosition.Y.Scale,
+            startPosition.Y.Offset + delta.Y
+        )
+    end
+end)
+
+--==================================================
+-- UI HELPERS
+--==================================================
+
+local function createButton(name, position, size)
+    local button = Instance.new("TextButton")
+
+    button.Name = name
+    button.Size = size
+    button.Position = position
+
+    button.BackgroundColor3 = PANEL
+    button.BorderSizePixel = 0
+
+    button.TextColor3 = WHITE
+    button.Font = Enum.Font.GothamMedium
+    button.TextSize = 13
+
+    button.AutoButtonColor = false
+    button.Parent = Main
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = button
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = WHITE
+    stroke.Thickness = 1
+    stroke.Transparency = 0.12
+    stroke.Parent = button
+
+    return button
+end
+
+local function updateButton(button, enabled)
+    if enabled then
+        button.BackgroundColor3 = Color3.fromRGB(65, 39, 95)
+    else
+        button.BackgroundColor3 = PANEL
+    end
+end
+
+--==================================================
+-- AIM BUTTON
+--==================================================
+
+local AimButton = createButton(
+    "AimButton",
+    UDim2.fromOffset(15, 82),
+    UDim2.new(1, -30, 0, 42)
+)
+
+local function refreshAimButton()
+    AimButton.Text = AIM_ENABLED and "AIM ASSIST     [ ON ]"
+        or "AIM ASSIST     [ OFF ]"
+
+    updateButton(AimButton, AIM_ENABLED)
+end
+
+AimButton.MouseButton1Click:Connect(function()
+    AIM_ENABLED = not AIM_ENABLED
+
+    if not AIM_ENABLED then
+        currentTarget = nil
+    end
+
+    refreshAimButton()
+end)
+
+refreshAimButton()
+
+--==================================================
+-- ESP BUTTON
+--==================================================
+
+local ESPButton = createButton(
+    "ESPButton",
+    UDim2.fromOffset(15, 132),
+    UDim2.new(1, -30, 0, 42)
+)
+
+local function refreshESPButton()
+    ESPButton.Text = ESP_ENABLED and "ENEMY ESP     [ ON ]"
+        or "ENEMY ESP     [ OFF ]"
+
+    updateButton(ESPButton, ESP_ENABLED)
+end
+
+ESPButton.MouseButton1Click:Connect(function()
+    ESP_ENABLED = not ESP_ENABLED
+    refreshESPButton()
+end)
+
+refreshESPButton()
+
+--==================================================
+-- TEAM CHECK BUTTON
+--==================================================
+
+local TeamButton = createButton(
+    "TeamButton",
+    UDim2.fromOffset(15, 182),
+    UDim2.new(1, -30, 0, 42)
+)
+
+local function refreshTeamButton()
+    TeamButton.Text = TEAM_CHECK and "TEAM CHECK     [ ON ]"
+        or "TEAM CHECK     [ OFF ]"
+
+    updateButton(TeamButton, TEAM_CHECK)
+end
+
+TeamButton.MouseButton1Click:Connect(function()
+    TEAM_CHECK = not TEAM_CHECK
+    currentTarget = nil
+    refreshTeamButton()
+end)
+
+refreshTeamButton()
+
+--==================================================
+-- TARGET PART SELECTOR
+--==================================================
+
+local TargetButton = createButton(
+    "TargetButton",
+    UDim2.fromOffset(15, 232),
+    UDim2.new(1, -30, 0, 42)
+)
+
+local function refreshTargetButton()
+    TargetButton.Text = "TARGET PART     [ " .. TARGET_PART:upper() .. " ]"
+end
+
+TargetButton.MouseButton1Click:Connect(function()
+    if TARGET_PART == "Head" then
+        TARGET_PART = "Torso"
+    else
+        TARGET_PART = "Head"
+    end
+
+    currentTarget = nil
+    refreshTargetButton()
+end)
+
+refreshTargetButton()
+
+--==================================================
+-- SMOOTHNESS SLIDER
+--==================================================
+
+local SliderLabel = Instance.new("TextLabel")
+SliderLabel.Size = UDim2.new(1, -30, 0, 22)
+SliderLabel.Position = UDim2.fromOffset(15, 283)
+SliderLabel.BackgroundTransparency = 1
+SliderLabel.TextColor3 = WHITE
+SliderLabel.Font = Enum.Font.GothamMedium
+SliderLabel.TextSize = 13
+SliderLabel.TextXAlignment = Enum.TextXAlignment.Left
+SliderLabel.Parent = Main
+
+local SliderTrack = Instance.new("Frame")
+SliderTrack.Size = UDim2.new(1, -30, 0, 7)
+SliderTrack.Position = UDim2.fromOffset(15, 312)
+SliderTrack.BackgroundColor3 = Color3.fromRGB(65, 65, 75)
+SliderTrack.BorderSizePixel = 0
+SliderTrack.Parent = Main
+
+Instance.new("UICorner", SliderTrack).CornerRadius = UDim.new(1, 0)
+
+local SliderFill = Instance.new("Frame")
+SliderFill.Size = UDim2.new(0, 0, 1, 0)
+SliderFill.BackgroundColor3 = PURPLE
+SliderFill.BorderSizePixel = 0
+SliderFill.Parent = SliderTrack
+
+Instance.new("UICorner", SliderFill).CornerRadius = UDim.new(1, 0)
+
+local SliderButton = Instance.new("TextButton")
+SliderButton.Size = UDim2.new(1, 0, 0, 30)
+SliderButton.Position = UDim2.new(0, 0, 0.5, -15)
+SliderButton.BackgroundTransparency = 1
+SliderButton.Text = ""
+SliderButton.Parent = SliderTrack
+
+local SliderDot = Instance.new("Frame")
+SliderDot.Size = UDim2.fromOffset(15, 15)
+SliderDot.AnchorPoint = Vector2.new(0.5, 0.5)
+SliderDot.Position = UDim2.new(0, 0, 0.5, 0)
+SliderDot.BackgroundColor3 = WHITE
+SliderDot.BorderSizePixel = 0
+SliderDot.Parent = SliderTrack
+
+Instance.new("UICorner", SliderDot).CornerRadius = UDim.new(1, 0)
+
+local function updateSlider(value)
+    SMOOTHNESS = math.clamp(math.floor(value + 0.5), 1, 30)
+
+    local alpha = (SMOOTHNESS - 1) / 29
+
+    SliderFill.Size = UDim2.new(alpha, 0, 1, 0)
+    SliderDot.Position = UDim2.new(alpha, 0, 0.5, 0)
+
+    SliderLabel.Text = "SMOOTHNESS                         " .. SMOOTHNESS
+end
+
+local sliderDragging = false
+
+local function setSliderFromInput(input)
+    local relativeX = input.Position.X - SliderTrack.AbsolutePosition.X
+    local alpha = math.clamp(relativeX / SliderTrack.AbsoluteSize.X, 0, 1)
+
+    updateSlider(1 + alpha * 29)
+end
+
+SliderButton.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+
+        sliderDragging = true
+        setSliderFromInput(input)
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if sliderDragging then
+        if input.UserInputType == Enum.UserInputType.MouseMovement
+            or input.UserInputType == Enum.UserInputType.Touch then
+
+            setSliderFromInput(input)
+        end
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+
+        sliderDragging = false
+    end
+end)
+
+updateSlider(SMOOTHNESS)
+
+--==================================================
+-- ESP
+--==================================================
+
+local function removeHighlight(player)
+    local highlight = highlights[player]
+
+    if highlight then
+        highlight:Destroy()
+        highlights[player] = nil
+    end
+end
+
+local function updateESP()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if ESP_ENABLED and isEnemy(player) then
+            local character = player.Character
+
+            if character then
+                local highlight = highlights[player]
+
+                if not highlight or highlight.Parent ~= character then
+                    removeHighlight(player)
+
+                    highlight = Instance.new("Highlight")
+                    highlight.Name = "OmarESP"
+                    highlight.Adornee = character
+                    highlight.FillColor = PURPLE
+                    highlight.OutlineColor = WHITE
+                    highlight.FillTransparency = 0.78
+                    highlight.OutlineTransparency = 0
+                    highlight.DepthMode = Enum.HighlightDepthMode.Occluded
+                    highlight.Parent = character
+
+                    highlights[player] = highlight
+                end
+            else
+                removeHighlight(player)
+            end
+        else
+            removeHighlight(player)
+        end
+    end
+end
+
+--==================================================
+-- TARGET ACQUISITION
+--==================================================
+
+local function getClosestTarget()
+    local camera = workspace.CurrentCamera
+
+    if not camera then
+        return nil
+    end
+
+    local viewport = camera.ViewportSize
+    local screenCenter = Vector2.new(viewport.X / 2, viewport.Y / 2)
+
+    local closestPlayer = nil
+    local closestDistance = math.huge
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if isValidTarget(player) then
+            local part = getTargetPart(player)
+
+            if part then
+                local screenPosition, visible =
+                    camera:WorldToViewportPoint(part.Position)
+
+                if visible and screenPosition.Z > 0 then
+                    local distance = (
+                        Vector2.new(screenPosition.X, screenPosition.Y)
+                        - screenCenter
+                    ).Magnitude
+
+                    if distance < closestDistance then
+                        closestDistance = distance
+                        closestPlayer = player
                     end
                 end
             end
         end
     end
 
-    return Closest
+    return closestPlayer
 end
 
-------------------------------------------------------------
--- AIM
-------------------------------------------------------------
+--==================================================
+-- AIM TRACKING
+--==================================================
 
-local function AimAt(Player)
-
-    if not Player then
+local function updateAim()
+    if not AIM_ENABLED then
+        currentTarget = nil
         return
     end
 
-    if not IsValidTarget(Player) then
+    local camera = workspace.CurrentCamera
+
+    if not camera then
         return
     end
 
-    local Character =
-        Player.Character
+    -- Keep the current target while valid.
+    if not isValidTarget(currentTarget) then
+        currentTarget = getClosestTarget()
+    end
 
-    local Part =
-        Character:FindFirstChild(
-            Settings.TargetPart
-        )
-
-    if not Part then
+    if not currentTarget then
         return
     end
 
-    local Desired =
-        CFrame.lookAt(
-            Camera.CFrame.Position,
-            Part.Position
-        )
+    local part = getTargetPart(currentTarget)
 
-    local Strength =
-        Settings.Smoothness / 100
+    if not part then
+        currentTarget = nil
+        return
+    end
 
-    -- Higher smoothness = stronger tracking.
-    -- 100% remains interpolated rather than
-    -- directly snapping the camera.
+    local cameraPosition = camera.CFrame.Position
 
-    local Alpha =
-        0.025 +
-        ((Strength ^ 2) * 0.93)
+    local desiredCFrame = CFrame.lookAt(
+        cameraPosition,
+        part.Position
+    )
 
-    Camera.CFrame =
-        Camera.CFrame:Lerp(
-            Desired,
-            math.clamp(
-                Alpha,
-                0,
-                0.98
-            )
-        )
+    -- Higher smoothness value means slower camera movement.
+    local alpha = math.clamp(1 / SMOOTHNESS, 0.01, 1)
+
+    camera.CFrame = camera.CFrame:Lerp(desiredCFrame, alpha)
 end
 
-------------------------------------------------------------
--- ESP CREATION
-------------------------------------------------------------
+--==================================================
+-- MAIN UPDATE
+--==================================================
 
-local function CreateESP(Player)
-
-    if Player == LocalPlayer then
+track(RunService.RenderStepped:Connect(function()
+    if not running then
         return
     end
 
-    if ESPObjects[Player] then
+    updateESP()
+    updateAim()
+end))
+
+--==================================================
+-- CLEANUP
+--==================================================
+
+local function cleanup()
+    if not running then
         return
     end
 
-    local Billboard =
-        Instance.new("BillboardGui")
-
-    Billboard.Name = "PlayerESP"
-
-    Billboard.Size =
-        UDim2.fromOffset(170, 75)
-
-    Billboard.StudsOffset =
-        Vector3.new(0, 2.8, 0)
-
-    Billboard.AlwaysOnTop = true
-    Billboard.Enabled = false
-
-    Billboard.Parent = Gui
-
-    --------------------------------------------------------
-    -- NAME
-    --------------------------------------------------------
-
-    local Name =
-        Instance.new("TextLabel")
-
-    Name.Name = "Name"
-
-    Name.Size =
-        UDim2.new(1, 0, 0, 20)
-
-    Name.BackgroundTransparency = 1
-
-    Name.TextColor3 =
-        Colors.White
-
-    Name.TextStrokeTransparency = 0.2
-
-    Name.TextSize = 14
-    Name.Font = Enum.Font.GothamBold
-
-    Name.Parent = Billboard
-
-    --------------------------------------------------------
-    -- DISTANCE
-    --------------------------------------------------------
-
-    local Distance =
-        Instance.new("TextLabel")
-
-    Distance.Name = "Distance"
-
-    Distance.Position =
-        UDim2.fromOffset(0, 20)
-
-    Distance.Size =
-        UDim2.new(1, 0, 0, 18)
-
-    Distance.BackgroundTransparency = 1
-
-    Distance.TextColor3 =
-        Colors.Gray
-
-    Distance.TextStrokeTransparency = 0.35
-
-    Distance.TextSize = 11
-    Distance.Font = Enum.Font.GothamMedium
-
-    Distance.Parent = Billboard
-
-    --------------------------------------------------------
-    -- HEALTH BACKGROUND
-    --------------------------------------------------------
-
-    local HealthBackground =
-        Instance.new("Frame")
-
-    HealthBackground.Name =
-        "HealthBackground"
-
-    HealthBackground.Position =
-        UDim2.fromOffset(25, 43)
-
-    HealthBackground.Size =
-        UDim2.new(1, -50, 0, 6)
-
-    HealthBackground.BackgroundColor3 =
-        Color3.fromRGB(35, 35, 40)
-
-    HealthBackground.BorderSizePixel = 0
-
-    HealthBackground.Parent = Billboard
-
-    local HealthCorner =
-        Instance.new("UICorner")
-
-    HealthCorner.CornerRadius =
-        UDim.new(1, 0)
-
-    HealthCorner.Parent =
-        HealthBackground
-
-    --------------------------------------------------------
-    -- HEALTH FILL
-    --------------------------------------------------------
-
-    local HealthFill =
-        Instance.new("Frame")
-
-    HealthFill.Name =
-        "HealthFill"
-
-    HealthFill.Size =
-        UDim2.fromScale(1, 1)
-
-    HealthFill.BackgroundColor3 =
-        Colors.Purple
-
-    HealthFill.BorderSizePixel = 0
-
-    HealthFill.Parent =
-        HealthBackground
-
-    local HealthFillCorner =
-        Instance.new("UICorner")
-
-    HealthFillCorner.CornerRadius =
-        UDim.new(1, 0)
-
-    HealthFillCorner.Parent =
-        HealthFill
-
-    --------------------------------------------------------
-    -- BOX
-    --------------------------------------------------------
-
-    local Box =
-        Instance.new("Frame")
-
-    Box.Name = "Box"
-
-    Box.AnchorPoint =
-        Vector2.new(0.5, 0.5)
-
-    Box.Position =
-        UDim2.fromScale(0.5, 0.5)
-
-    Box.Size =
-        UDim2.fromOffset(70, 100)
-
-    Box.BackgroundTransparency = 1
-
-    Box.Parent = Billboard
-
-    local BoxStroke =
-        Instance.new("UIStroke")
-
-    BoxStroke.Color =
-        Colors.Purple
-
-    BoxStroke.Thickness = 1.5
-
-    BoxStroke.Parent = Box
-
-    --------------------------------------------------------
-    -- SAVE
-    --------------------------------------------------------
-
-    ESPObjects[Player] = {
-
-        Gui = Billboard,
-
-        Name = Name,
-        Distance = Distance,
-
-        HealthBackground =
-            HealthBackground,
-
-        HealthFill =
-            HealthFill,
-
-        Box = Box,
-    }
+    running = false
+    AIM_ENABLED = false
+    ESP_ENABLED = false
+    currentTarget = nil
+
+    for _, connection in ipairs(connections) do
+        if connection.Connected then
+            connection:Disconnect()
+        end
+    end
+
+    for player in pairs(highlights) do
+        removeHighlight(player)
+    end
+
+    ScreenGui:Destroy()
 end
 
-------------------------------------------------------------
--- REMOVE ESP
-------------------------------------------------------------
+CloseButton.MouseButton1Click:Connect(cleanup)
 
-local function RemoveESP(Player)
-
-    local Data =
-        ESPObjects[Player]
-
-    if Data then
-
-        Data.Gui:Destroy()
-
-        ESPObjects[Player] = nil
-    end
-end
-
-------------------------------------------------------------
--- CREATE ESP FOR EXISTING PLAYERS
-------------------------------------------------------------
-
-for _, Player in ipairs(
-    Players:GetPlayers()
-) do
-
-    CreateESP(Player)
-end
-
-Players.PlayerAdded:Connect(
-    CreateESP
-)
-
-Players.PlayerRemoving:Connect(
-    RemoveESP
-)
-
-------------------------------------------------------------
--- UPDATE ESP
-------------------------------------------------------------
-
-local function UpdateESP(
-    Player,
-    Data
-)
-
-    --------------------------------------------------------
-    -- MASTER ESP TOGGLE
-    --------------------------------------------------------
-
-    if not Settings.ESPEnabled then
-
-        Data.Gui.Enabled = false
-        return
-    end
-
-    --------------------------------------------------------
-    -- CHARACTER
-    --------------------------------------------------------
-
-    local Character =
-        Player.Character
-
-    if not Character then
-
-        Data.Gui.Enabled = false
-        return
-    end
-
-    local Head =
-        Character:FindFirstChild(
-            "Head"
-        )
-
-    local Root =
-        Character:FindFirstChild(
-            "HumanoidRootPart"
-        )
-
-    local Humanoid =
-        Character:FindFirstChildOfClass(
-            "Humanoid"
-        )
-
-    if not Head
-        or not Root
-        or not Humanoid then
-
-        Data.Gui.Enabled = false
-        return
-    end
-
-    if Settings.IgnoreDead
-        and Humanoid.Health <= 0 then
-
-        Data.Gui.Enabled = false
-        return
-    end
-
-    --------------------------------------------------------
-    -- ENABLE
-    --------------------------------------------------------
-
-    Data.Gui.Adornee =
-        Head
-
-    Data.Gui.Enabled = true
-
-    --------------------------------------------------------
-    -- NAME
-    --------------------------------------------------------
-
-    Data.Name.Visible =
-        Settings.ESP.Name
-
-    Data.Name.Text =
-        Player.DisplayName ..
-        "  [" ..
-        Player.Name ..
-        "]"
-
-    --------------------------------------------------------
-    -- DISTANCE
-    --------------------------------------------------------
-
-    Data.Distance.Visible =
-        Settings.ESP.Distance
-
-    local MyCharacter =
-        LocalPlayer.Character
-
-    local MyRoot =
-        MyCharacter and
-        MyCharacter:FindFirstChild(
-            "HumanoidRootPart"
-        )
-
-    if MyRoot then
-
-        local Distance =
-            (
-                Root.Position -
-                MyRoot.Position
-            ).Magnitude
-
-        Data.Distance.Text =
-            math.floor(
-                Distance
-            ) .. " studs"
-    end
-
-    --------------------------------------------------------
-    -- HEALTH
-    --------------------------------------------------------
-
-    Data.HealthBackground.Visible =
-        Settings.ESP.Health
-
-    local HealthPercent =
-        math.clamp(
-            Humanoid.Health /
-            Humanoid.MaxHealth,
-            0,
-            1
-        )
-
-    Data.HealthFill.Size =
-        UDim2.fromScale(
-            HealthPercent,
-            1
-        )
-
-    --------------------------------------------------------
-    -- BOX
-    --------------------------------------------------------
-
-    Data.Box.Visible =
-        Settings.ESP.Box
-end
-
-------------------------------------------------------------
--- MOUSE INPUT
-------------------------------------------------------------
-
-UserInputService.InputBegan:Connect(
-    function(Input, Processed)
-
-        if Processed then
-            return
-        end
-
-        if Input.UserInputType ==
-            Enum.UserInputType.MouseButton2 then
-
-            RMBDown = true
-        end
-    end
-)
-
-UserInputService.InputEnded:Connect(
-    function(Input)
-
-        if Input.UserInputType ==
-            Enum.UserInputType.MouseButton2 then
-
-            RMBDown = false
-        end
-    end
-)
-
-------------------------------------------------------------
--- DRAGGABLE WINDOW
-------------------------------------------------------------
-
-local Dragging = false
-local DragStart
-local StartPosition
-
-TitleBar.InputBegan:Connect(
-    function(Input)
-
-        if Input.UserInputType ==
-            Enum.UserInputType.MouseButton1 then
-
-            Dragging = true
-
-            DragStart =
-                Input.Position
-
-            StartPosition =
-                Main.Position
-        end
-    end
-)
-
-UserInputService.InputChanged:Connect(
-    function(Input)
-
-        if Dragging
-            and Input.UserInputType ==
-                Enum.UserInputType.MouseMovement then
-
-            local Delta =
-                Input.Position -
-                DragStart
-
-            Main.Position =
-                UDim2.new(
-
-                    StartPosition.X.Scale,
-
-                    StartPosition.X.Offset +
-                        Delta.X,
-
-                    StartPosition.Y.Scale,
-
-                    StartPosition.Y.Offset +
-                        Delta.Y
-                )
-        end
-    end
-)
-
-UserInputService.InputEnded:Connect(
-    function(Input)
-
-        if Input.UserInputType ==
-            Enum.UserInputType.MouseButton1 then
-
-            Dragging = false
-        end
-    end
-)
-
-------------------------------------------------------------
--- OPEN BUTTON
-------------------------------------------------------------
-
-local Reopen =
-    Instance.new("TextButton")
-
-Reopen.Size =
-    UDim2.fromOffset(75, 36)
-
-Reopen.Position =
-    UDim2.fromOffset(20, 20)
-
-Reopen.BackgroundColor3 =
-    Colors.Panel
-
-Reopen.Text = "OPEN"
-
-Reopen.TextColor3 =
-    Colors.White
-
-Reopen.TextSize = 12
-Reopen.Font = Enum.Font.GothamBold
-
-Reopen.Visible = false
-
-Reopen.Parent = Gui
-
-local ReopenCorner =
-    Instance.new("UICorner")
-
-ReopenCorner.CornerRadius =
-    UDim.new(0, 8)
-
-ReopenCorner.Parent =
-    Reopen
-
-local ReopenStroke =
-    Instance.new("UIStroke")
-
-ReopenStroke.Color =
-    Colors.Purple
-
-ReopenStroke.Thickness = 1
-
-ReopenStroke.Parent =
-    Reopen
-
-------------------------------------------------------------
--- CLOSE / REOPEN
-------------------------------------------------------------
-
-Close.MouseButton1Click:Connect(
-    function()
-
-        Main.Visible = false
-        Reopen.Visible = true
-        MenuOpen = false
-    end
-)
-
-Reopen.MouseButton1Click:Connect(
-    function()
-
-        Main.Visible = true
-        Reopen.Visible = false
-        MenuOpen = true
-    end
-)
-
-------------------------------------------------------------
--- INSERT = HIDE / SHOW
-------------------------------------------------------------
-
-UserInputService.InputBegan:Connect(
-    function(Input, Processed)
-
-        if Processed then
-            return
-        end
-
-        if Input.KeyCode ==
-            Enum.KeyCode.Insert then
-
-            MenuOpen =
-                not MenuOpen
-
-            Main.Visible =
-                MenuOpen
-
-            Reopen.Visible =
-                not MenuOpen
-        end
-    end
-)
-
-------------------------------------------------------------
--- MAIN LOOP
-------------------------------------------------------------
-
-RunService.RenderStepped:Connect(
-    function()
-
-        ----------------------------------------------------
-        -- AIM
-        ----------------------------------------------------
-
-        if Settings.AimEnabled then
-
-            local ShouldAim = true
-
-            if Settings.HoldToAim then
-
-                ShouldAim =
-                    RMBDown
-            end
-
-            if ShouldAim then
-
-                -- Keep the current target while valid.
-                -- This prevents unnecessary switching.
-
-                if not CurrentTarget
-                    or not IsValidTarget(
-                        CurrentTarget
-                    ) then
-
-                    CurrentTarget =
-                        GetClosestTarget()
-                end
-
-                if CurrentTarget then
-
-                    AimAt(
-                        CurrentTarget
-                    )
-                end
-
-            else
-
-                CurrentTarget = nil
-            end
-
-        else
-
-            CurrentTarget = nil
-        end
-
-        ----------------------------------------------------
-        -- ESP
-        ----------------------------------------------------
-
-        for Player, Data in pairs(
-            ESPObjects
-        ) do
-
-            UpdateESP(
-                Player,
-                Data
-            )
-        end
-    end
-)
-
-------------------------------------------------------------
--- DONE
-------------------------------------------------------------
-
-print(
-    "Aim + ESP loaded | Crate by, Omar"
-)
+print("Omar Aim Assist loaded successfully.")
