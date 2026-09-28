@@ -1,7 +1,8 @@
 --[[
-    Omar Hub v15
+    Omar Hub v35
     Credit: Made by Omar
     For use ONLY in your own Roblox game.
+    Based on v15 (confirmed working) + later QoL fixes, no silent aim.
 --]]
 
 local Players          = game:GetService("Players")
@@ -119,8 +120,6 @@ Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
 -- ================================================================
 -- FLOATING QUICK-PILLS (OMAR + AIM) — mobile-safe, draggable
 -- ================================================================
-
--- Shared drag helper: makes any GuiObject draggable with tap detection
 local function makeDraggable(button, onTap)
     local dragging  = false
     local moved     = false
@@ -172,11 +171,10 @@ local function makeDraggable(button, onTap)
     end))
 end
 
--- -------- OMAR pill (open/close menu) --------
+-- OMAR pill (opens menu)
 local FloatPill = Instance.new("TextButton")
-FloatPill.Name = "OmarPill"
 FloatPill.Size = UDim2.new(0, 72, 0, 28)
-FloatPill.Position = UDim2.new(0, 14, 0, 90)
+FloatPill.Position = UDim2.new(0, 14, 1, -80)
 FloatPill.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 FloatPill.Text = "OMAR"
 FloatPill.TextColor3 = Color3.fromRGB(180, 100, 240)
@@ -192,19 +190,11 @@ Instance.new("UICorner", FloatPill).CornerRadius = UDim.new(0, 6)
 local PillStroke = Instance.new("UIStroke", FloatPill)
 PillStroke.Color = Color3.fromRGB(150, 70, 220)
 PillStroke.Thickness = 1.5
-PillStroke.Transparency = 0.15
 
-makeDraggable(FloatPill, function()
-    Main.Visible = true
-    FloatPill.Visible = false
-    AimPill.Visible = false
-end)
-
--- -------- AIM pill (quick aimbot toggle) --------
+-- AIM pill (toggles aimbot)
 local AimPill = Instance.new("TextButton")
-AimPill.Name = "AimPill"
 AimPill.Size = UDim2.new(0, 72, 0, 28)
-AimPill.Position = UDim2.new(0, 14, 0, 124)
+AimPill.Position = UDim2.new(0, 14, 1, -46)
 AimPill.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 AimPill.Text = "AIM: OFF"
 AimPill.TextColor3 = Color3.fromRGB(200, 90, 120)
@@ -220,7 +210,6 @@ Instance.new("UICorner", AimPill).CornerRadius = UDim.new(0, 6)
 local AimStroke = Instance.new("UIStroke", AimPill)
 AimStroke.Color = Color3.fromRGB(200, 60, 100)
 AimStroke.Thickness = 1.5
-AimStroke.Transparency = 0.15
 
 local function refreshAimPill()
     if Config.Aimbot.Enabled then
@@ -235,14 +224,18 @@ local function refreshAimPill()
 end
 refreshAimPill()
 
+makeDraggable(FloatPill, function()
+    Main.Visible = true
+    FloatPill.Visible = false
+    AimPill.Visible = false
+end)
+
 makeDraggable(AimPill, function()
     Config.Aimbot.Enabled = not Config.Aimbot.Enabled
     refreshAimPill()
-    -- The Heartbeat watcher inside the aimbot section detects the change and
-    -- rebinds/unbinds automatically.
 end)
 
--- Drag main panel by its title bar
+-- Drag main panel
 do
     local dragging, dragStart, startPos = false, nil, nil
     track(TitleBar.InputBegan:Connect(function(input)
@@ -273,7 +266,7 @@ do
     end))
 end
 
--- Tabs
+-- Tabs (Aimbot first)
 local TabsBar = Instance.new("Frame")
 TabsBar.Size = UDim2.new(1, -20, 0, 30)
 TabsBar.Position = UDim2.new(0, 10, 0, 40)
@@ -296,23 +289,14 @@ local function makeTab(name, order, total)
     Instance.new("UICorner", tab).CornerRadius = UDim.new(0, 5)
     return tab
 end
-local EspTabBtn = makeTab("ESP", 1, 2)
-local AimTabBtn = makeTab("Aimbot", 2, 2)
+local AimTabBtn = makeTab("Aimbot", 1, 2)
+local EspTabBtn = makeTab("ESP", 2, 2)
 
 local Body = Instance.new("Frame")
 Body.Size = UDim2.new(1, -20, 1, -116)
 Body.Position = UDim2.new(0, 10, 0, 76)
 Body.BackgroundTransparency = 1
 Body.Parent = Main
-
-local EspPage = Instance.new("ScrollingFrame")
-EspPage.Size = UDim2.new(1, 0, 1, 0)
-EspPage.BackgroundTransparency = 1
-EspPage.BorderSizePixel = 0
-EspPage.ScrollBarThickness = 3
-EspPage.ScrollBarImageColor3 = Color3.fromRGB(140, 60, 220)
-EspPage.CanvasSize = UDim2.new(0, 0, 0, 240)
-EspPage.Parent = Body
 
 local AimPage = Instance.new("ScrollingFrame")
 AimPage.Size = UDim2.new(1, 0, 1, 0)
@@ -321,8 +305,17 @@ AimPage.BorderSizePixel = 0
 AimPage.ScrollBarThickness = 3
 AimPage.ScrollBarImageColor3 = Color3.fromRGB(140, 60, 220)
 AimPage.CanvasSize = UDim2.new(0, 0, 0, 300)
-AimPage.Visible = false
 AimPage.Parent = Body
+
+local EspPage = Instance.new("ScrollingFrame")
+EspPage.Size = UDim2.new(1, 0, 1, 0)
+EspPage.BackgroundTransparency = 1
+EspPage.BorderSizePixel = 0
+EspPage.ScrollBarThickness = 3
+EspPage.ScrollBarImageColor3 = Color3.fromRGB(140, 60, 220)
+EspPage.CanvasSize = UDim2.new(0, 0, 0, 240)
+EspPage.Visible = false
+EspPage.Parent = Body
 
 local function setActiveTab(which)
     if which == "esp" then
@@ -335,9 +328,9 @@ local function setActiveTab(which)
         AimTabBtn.BackgroundColor3 = Color3.fromRGB(90, 40, 140)
     end
 end
-setActiveTab("esp")
-track(EspTabBtn.MouseButton1Click:Connect(function() setActiveTab("esp") end))
+setActiveTab("aim")
 track(AimTabBtn.MouseButton1Click:Connect(function() setActiveTab("aim") end))
+track(EspTabBtn.MouseButton1Click:Connect(function() setActiveTab("esp") end))
 
 -- ============ WIDGETS ============
 local function makeToggle(parent, text, yPos, default, callback)
@@ -496,17 +489,7 @@ local function makeSlider(parent, text, yPos, min, max, default, callback)
     return Frame
 end
 
--- ============ ESP PAGE ============
-local ey = 4
-makeToggle(EspPage, "ESP Enabled", ey, Config.ESP.Enabled, function(v) Config.ESP.Enabled = v end); ey = ey + 36
-makeToggle(EspPage, "Show Name", ey, Config.ESP.ShowName, function(v) Config.ESP.ShowName = v end); ey = ey + 36
-makeToggle(EspPage, "Show Distance", ey, Config.ESP.ShowDistance, function(v) Config.ESP.ShowDistance = v end); ey = ey + 36
-makeToggle(EspPage, "Show Health", ey, Config.ESP.ShowHealth, function(v) Config.ESP.ShowHealth = v end); ey = ey + 36
-makeToggle(EspPage, "Show Box", ey, Config.ESP.ShowBox, function(v) Config.ESP.ShowBox = v end); ey = ey + 36
-makeToggle(EspPage, "Team Check", ey, Config.ESP.TeamCheck, function(v) Config.ESP.TeamCheck = v end); ey = ey + 36
-EspPage.CanvasSize = UDim2.new(0, 0, 0, ey + 6)
-
--- ============ AIMBOT PAGE ============
+-- AIMBOT PAGE
 local ay = 4
 makeToggle(AimPage, "Aimbot Enabled", ay, Config.Aimbot.Enabled, function(v)
     Config.Aimbot.Enabled = v
@@ -519,6 +502,16 @@ makeSlider(AimPage, "FOV", ay, 30, 500, Config.Aimbot.FOV, function(v) Config.Ai
 makeSlider(AimPage, "Smoothness (1 soft - 100 hard)", ay, 1, 100, Config.Aimbot.Smoothness, function(v) Config.Aimbot.Smoothness = v end); ay = ay + 48
 AimPage.CanvasSize = UDim2.new(0, 0, 0, ay + 6)
 
+-- ESP PAGE
+local ey = 4
+makeToggle(EspPage, "ESP Enabled", ey, Config.ESP.Enabled, function(v) Config.ESP.Enabled = v end); ey = ey + 36
+makeToggle(EspPage, "Show Name", ey, Config.ESP.ShowName, function(v) Config.ESP.ShowName = v end); ey = ey + 36
+makeToggle(EspPage, "Show Distance", ey, Config.ESP.ShowDistance, function(v) Config.ESP.ShowDistance = v end); ey = ey + 36
+makeToggle(EspPage, "Show Health", ey, Config.ESP.ShowHealth, function(v) Config.ESP.ShowHealth = v end); ey = ey + 36
+makeToggle(EspPage, "Show Box", ey, Config.ESP.ShowBox, function(v) Config.ESP.ShowBox = v end); ey = ey + 36
+makeToggle(EspPage, "Team Check", ey, Config.ESP.TeamCheck, function(v) Config.ESP.TeamCheck = v end); ey = ey + 36
+EspPage.CanvasSize = UDim2.new(0, 0, 0, ey + 6)
+
 local Credit = Instance.new("TextLabel")
 Credit.Size = UDim2.new(1, 0, 0, 18)
 Credit.Position = UDim2.new(0, 0, 1, -20)
@@ -529,7 +522,7 @@ Credit.Font = Enum.Font.GothamBold
 Credit.TextSize = 12
 Credit.Parent = Main
 
--- ============ FOV CIRCLE (visible, thick, with center dot) ============
+-- FOV RING
 local FovRing = Instance.new("Frame")
 FovRing.AnchorPoint = Vector2.new(0.5, 0.5)
 FovRing.BackgroundTransparency = 1
@@ -808,7 +801,7 @@ local function drawESP(t)
     end
 end
 
--- ============ MOUSE STATE (for Hold-Mouse mode) ============
+-- ============ MOUSE STATE ============
 local mouseHeld = false
 track(UserInputService.InputBegan:Connect(function(input, gp)
     if gp then return end
@@ -882,7 +875,6 @@ local function targetIsValid(part)
 end
 
 local function aimStep()
-    -- FOV ring visibility follows Aimbot state
     if Config.Aimbot.Enabled then
         local radius = Config.Aimbot.FOV
         FovRing.Size = UDim2.new(0, radius * 2, 0, radius * 2)
@@ -901,10 +893,8 @@ local function aimStep()
         return
     end
 
-    -- Hold-Mouse gate: don't lock camera / rotate character unless firing
     local gated = (Config.Aimbot.LockMode == "Hold Mouse") and not mouseHeld
 
-    -- Refresh target
     if not targetIsValid(currentTarget) then
         currentTarget = nil
     end
@@ -920,7 +910,6 @@ local function aimStep()
         currentTarget = findBestTarget()
     end
 
-    -- Always draw target dot (preview) even when gated
     if currentTarget then
         local sp, on = Camera:WorldToViewportPoint(currentTarget.Position)
         if on and sp.Z > 0 then
@@ -942,12 +931,10 @@ local function aimStep()
     local aimPos = currentTarget.Position
     local alpha = math.clamp(Config.Aimbot.Smoothness / 100, 0.01, 1)
 
-    -- Camera lock
     local curCF = Camera.CFrame
     local desiredCF = CFrame.new(curCF.Position, aimPos)
     Camera.CFrame = curCF:Lerp(desiredCF, alpha)
 
-    -- Character rotation lock — only when locking fairly hard
     if alpha >= 0.4 then
         local char = LocalPlayer.Character
         local hrp  = char and char:FindFirstChild("HumanoidRootPart")
@@ -985,7 +972,6 @@ local function refreshBinding()
     end
 end
 
--- Watch Aimbot.Enabled and rebind on change (covers both pill and menu toggles)
 local oldEnabled = Config.Aimbot.Enabled
 track(RunService.Heartbeat:Connect(function()
     if Config.Aimbot.Enabled ~= oldEnabled then
@@ -995,7 +981,6 @@ track(RunService.Heartbeat:Connect(function()
     end
 end))
 
--- Ensure AutoRotate is restored whenever aimbot is off
 track(RunService.Stepped:Connect(function()
     if Config.Aimbot.Enabled then return end
     local char = LocalPlayer.Character
