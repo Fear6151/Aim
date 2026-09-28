@@ -1,7 +1,7 @@
 --[[
     Omar Hub
     Credit: Made by Omar
-
+    
 --]]
 
 local Players          = game:GetService("Players")
@@ -110,7 +110,7 @@ CloseBtn.BorderSizePixel = 0
 CloseBtn.Parent = BtnRow
 Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
 
--- Pills
+-- ============ PILLS ============
 local function makeDraggable(button, onTap)
     local dragging, moved, dragStart, startPos = false, false, nil, nil
     local function clamp(pos)
@@ -773,8 +773,7 @@ track(UserInputService.InputEnded:Connect(function(input)
     end
 end))
 
--- ============ SILENT AIM TARGET (nearest to crosshair, no walls) ============
--- Silently picks nearest to crosshair, ALWAYS ignores wall-blocked targets.
+-- ============ SILENT AIM TARGET (nearest crosshair, skips walls) ============
 local function findSilentTarget()
     local vp = Camera.ViewportSize
     local center = Vector2.new(vp.X / 2, vp.Y / 2)
@@ -788,13 +787,11 @@ local function findSilentTarget()
         if not part then return end
         local worldDist = (origin - part.Position).Magnitude
         if worldDist > Config.SilentAim.MaxDist then return end
-        -- ALWAYS skip targets behind walls (no toggle)
         if not hasLineOfSight(part) then return end
         local sp, on = Camera:WorldToViewportPoint(part.Position)
         if not on or sp.Z <= 0 then return end
         local screenDist = (Vector2.new(sp.X, sp.Y) - center).Magnitude
         if screenDist > Config.SilentAim.FOV then return end
-        -- Score: nearest to crosshair + small world-distance tiebreak
         local score = screenDist + (worldDist / 50)
         if score < bestScore then
             bestScore = score
@@ -804,73 +801,174 @@ local function findSilentTarget()
 
     for _, char in ipairs(players) do test(char) end
     for _, char in ipairs(npcs)    do test(char) end
-
     return bestPart
 end
 
--- ============ SILENT AIM RAY HOOK ============
--- Intercepts Workspace:Raycast / RaycastAll and Workspace:FindPartOnRay family
--- to redirect weapon fire toward the silent target without moving the camera.
+-- ============ SILENT AIM RAY HOOKS ============
+local originalRaycast              = Workspace.Raycast
+local originalRaycastAll           = Workspace.RaycastAll
+local originalFindPartOnRay        = Workspace.FindPartOnRay
+local originalFindPartOnRayIgnore  = Workspace.FindPartOnRayWithIgnoreList
 
-local originalRaycast    = Workspace.Raycast
-local originalRaycastAll = Workspace.RaycastAll
+local silentFiring  = false
+local silentTapUntil = 0
 
-local function shouldRedirect(origin, direction, params)
-    if not Config.SilentAim.Enabled then return false end
-    if not mouseHeld then return false end
-    if Config.SilentAim.HitChance <= 0 then return false end
-    if Config.SilentAim.HitChance < 100 then
-        if math.random(1, 100) > Config.SilentAim.HitChance then return false end
+local function silentTrigger() silentTapUntil = tick() + 0.15 end
+
+track(UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+    or input.UserInputType == Enum.UserInputType.Touch then
+        silentFiring = true
+        silentTrigger()
     end
+end))
+track(UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+    or input.UserInputType == Enum.UserInputType.Touch then
+        silentFiring = false
+    end
+end))
 
-    -- Only redirect if the ray looks like it came from the camera
-    local camOrigin = Camera.CFrame.Position
-    local camDir    = Camera.CFrame.LookVector
-    local originDelta = (origin - camOrigin).Magnitude
-    if originDelta > 8 then return false end      -- not a camera-origin ray
+local function bindToolActivated(tool)
+    if not tool or not tool:IsA("Tool") then return end
+    track(tool.Activated:Connect(function() silentTrigger() end))
+end
 
-    local dirDot = direction.Unit:Dot(camDir)
-    if dirDot < 0.5 then return false end          -- not firing forward
+local function watchCharacter(char)
+    if not char then return end
+    char.ChildAdded:Connect(function(child)
+        if child:IsA("Tool") then bindToolActivated(child) end
+    end)
+    for _, c in ipairs(char:GetChildren()) do
+        if c:IsA("Tool") then bindToolActivated(c) end
+    end
+end
 
+if LocalPlayer.Character then watchCharacter(LocalPlayer.Character) end
+track(LocalPlayer.CharacterAdded:Connect(watchCharacter))
+
+local function isFiringNow() return silentFiring or tick() < silentTapUntil end
+
+local function vectorIsCloseToCameraOrigin(v)
+    return (v - Camera.CFrame.Position).Magnitude < 30
+end
+
+local function directionLooksLikeCamera(dir)
+    if not dir or dir.Magnitude < 0.001 then return false end
+    return dir.Unit:Dot(Camera.CFrame.LookVector) > 0.15
+end
+
+local function filterAllowsTarget(params, targetChar, targetPart)
+    if not params then return true end
+    local list = params.FilterDescendantsInstances
+    if not list then return true end
+    for _, inst in ipairs(list) do
+        if inst == targetChar or inst == targetPart then return false end
+    end
     return true
 end
 
-local function buildRedirectRay(origin, direction, params)
+local function tryRedirect(origin, direction, params)
+    if not Config.SilentAim.Enabled then return nil end
+    if not isFiringNow() then return nil end
+    if Config.SilentAim.HitChance <= 0 then return nil end
+    if Config.SilentAim.HitChance < 100 then
+        if math.random(1, 100) > Config.SilentAim.HitChance then return nil end
+    end
+    if not vectorIsCloseToCameraOrigin(origin) then return nil end
+    if not directionLooksLikeCamera(direction) then return nil end
+
     local target = findSilentTarget()
     if not target then return nil end
-    -- Ensure target not accidentally filtered out by caller's params
-    local tChar = target.Parent
-    if params and params.FilterDescendantsInstances then
-        for _, inst in ipairs(params.FilterDescendantsInstances) do
-            if inst == tChar or inst == target then
-                return nil
-            end
-        end
-    end
-    local newDir = (target.Position - origin)
-    return newDir, target
+    if not filterAllowsTarget(params, target.Parent, target) then return nil end
+
+    return (target.Position - origin), target
 end
 
--- Hook Raycast
 Workspace.Raycast = function(self, origin, direction, params)
-    if self == Workspace and shouldRedirect(origin, direction, params) then
-        local newDir = buildRedirectRay(origin, direction, params)
-        if newDir then
-            return originalRaycast(self, origin, newDir, params)
-        end
+    if self == Workspace then
+        local newDir = tryRedirect(origin, direction, params)
+        if newDir then return originalRaycast(self, origin, newDir, params) end
     end
     return originalRaycast(self, origin, direction, params)
 end
 
--- Hook RaycastAll
 Workspace.RaycastAll = function(self, origin, direction, params)
-    if self == Workspace and shouldRedirect(origin, direction, params) then
-        local newDir = buildRedirectRay(origin, direction, params)
-        if newDir then
-            return originalRaycastAll(self, origin, newDir, params)
-        end
+    if self == Workspace then
+        local newDir = tryRedirect(origin, direction, params)
+        if newDir then return originalRaycastAll(self, origin, newDir, params) end
     end
     return originalRaycastAll(self, origin, direction, params)
+end
+
+Workspace.FindPartOnRay = function(self, ray, ignore, cells, water)
+    if self == Workspace and ray then
+        if Config.SilentAim.Enabled and isFiringNow()
+        and vectorIsCloseToCameraOrigin(ray.Origin)
+        and directionLooksLikeCamera(ray.Direction) then
+            local target = findSilentTarget()
+            if target then
+                local newRay = Ray.new(ray.Origin, target.Position - ray.Origin)
+                return originalFindPartOnRay(self, newRay, ignore, cells, water)
+            end
+        end
+    end
+    return originalFindPartOnRay(self, ray, ignore, cells, water)
+end
+
+Workspace.FindPartOnRayWithIgnoreList = function(self, ray, ignoreList, cells, water)
+    if self == Workspace and ray then
+        if Config.SilentAim.Enabled and isFiringNow()
+        and vectorIsCloseToCameraOrigin(ray.Origin)
+        and directionLooksLikeCamera(ray.Direction) then
+            local target = findSilentTarget()
+            if target then
+                local blocked = false
+                if ignoreList then
+                    for _, inst in ipairs(ignoreList) do
+                        if inst == target or inst == target.Parent then
+                            blocked = true; break
+                        end
+                    end
+                end
+                if not blocked then
+                    local newRay = Ray.new(ray.Origin, target.Position - ray.Origin)
+                    return originalFindPartOnRayIgnore(self, newRay, ignoreList, cells, water)
+                end
+            end
+        end
+    end
+    return originalFindPartOnRayIgnore(self, ray, ignoreList, cells, water)
+end
+
+-- Mouse.Hit / Mouse.UnitRay metatable hook
+do
+    local Mouse = LocalPlayer:GetMouse()
+    if Mouse then
+        local mt = getmetatable(Mouse)
+        if mt and not mt.__silent_hooked then
+            local originalIndex = mt.__index
+            mt.__index = function(tbl, key)
+                if (key == "Hit" or key == "UnitRay") and
+                   Config.SilentAim.Enabled and isFiringNow() then
+                    local target = findSilentTarget()
+                    if target then
+                        local origin = Camera.CFrame.Position
+                        local dir    = (target.Position - origin)
+                        if key == "UnitRay" then
+                            return Ray.new(origin, dir.Unit)
+                        else
+                            return CFrame.new(target.Position)
+                        end
+                    end
+                end
+                if originalIndex then return originalIndex(tbl, key) end
+                return rawget(tbl, key)
+            end
+            mt.__silent_hooked = true
+        end
+    end
 end
 
 -- ============ AIMBOT ============
@@ -953,7 +1051,6 @@ local function aimStep()
         TargetDot.Visible = false; TargetDotInner.Visible = false
     end
 
-    -- Silent ring
     if Config.SilentAim.Enabled then
         local r = Config.SilentAim.FOV
         SilentRing.Size = UDim2.new(0, r * 2, 0, r * 2)
@@ -965,12 +1062,8 @@ local function aimStep()
             if on and sp.Z > 0 then
                 SilentDot.Visible = true
                 SilentDot.Position = Vector2.new(sp.X, sp.Y)
-            else
-                SilentDot.Visible = false
-            end
-        else
-            SilentDot.Visible = false
-        end
+            else SilentDot.Visible = false end
+        else SilentDot.Visible = false end
     else
         SilentRing.Visible = false
         SilentDot.Visible = false
@@ -1036,88 +1129,9 @@ local function aimStep()
     end
 end
 
-local function refreshBinding()
-    if Config.Aimbot.Enabled then
-        if not bound then
-            RunService:BindToRenderStep(AIMBOT_BIND_NAME, Enum.RenderPriority.Camera.Value + 1, aimStep)
-            bound = true
-        end
-    else
-        currentTarget = nil; currentTargetScore = math.huge; targetStickTime = 0
-        TargetDot.Visible = false; TargetDotInner.Visible = false
-        FovRing.Visible = false; FovGlow.Visible = false; CenterDot.Visible = false
-        if bound then
-            pcall(function() RunService:UnbindFromRenderStep(AIMBOT_BIND_NAME) end)
-            bound = false
-        end
-        local char = LocalPlayer.Character
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-        if hum then hum.AutoRotate = true end
-    end
-end
-
--- Ring + silent preview step (always runs to update the silent dot)
-if not bound then
-    RunService:BindToRenderStep("OmarHubUI", Enum.RenderPriority.Camera.Value + 1, function()
-        if Config.Aimbot.Enabled and not bound then
-            -- actual binding is handled below via Heartbeat watcher
-        end
-        -- draw the silent preview + rings every frame
-        if Config.Aimbot.Enabled then
-            local r = Config.Aimbot.FOV
-            FovRing.Size = UDim2.new(0, r * 2, 0, r * 2)
-            FovRing.Position = UDim2.new(0.5, 0, 0.5, 0)
-            FovRing.Visible = true
-            FovGlow.Size = UDim2.new(0, r * 2 + 6, 0, r * 2 + 6)
-            FovGlow.Position = UDim2.new(0.5, 0, 0.5, 0)
-            FovGlow.Visible = true
-            CenterDot.Visible = true
-        else
-            FovRing.Visible = false; FovGlow.Visible = false; CenterDot.Visible = false
-            TargetDot.Visible = false; TargetDotInner.Visible = false
-        end
-
-        if Config.SilentAim.Enabled then
-            local r = Config.SilentAim.FOV
-            SilentRing.Size = UDim2.new(0, r * 2, 0, r * 2)
-            SilentRing.Position = UDim2.new(0.5, 0, 0.5, 0)
-            SilentRing.Visible = true
-            local st = findSilentTarget()
-            if st then
-                local sp, on = Camera:WorldToViewportPoint(st.Position)
-                if on and sp.Z > 0 then
-                    SilentDot.Visible = true
-                    SilentDot.Position = Vector2.new(sp.X, sp.Y)
-                else
-                    SilentDot.Visible = false
-                end
-            else
-                SilentDot.Visible = false
-            end
-        else
-            SilentRing.Visible = false
-            SilentDot.Visible = false
-        end
-
-        -- Aimbot bind/step inline (so we don't need two binds)
-        if Config.Aimbot.Enabled then
-            if not bound then
-                RunService:BindToRenderStep(AIMBOT_BIND_NAME, Enum.RenderPriority.Camera.Value + 2, aimStep)
-                bound = true
-            end
-        else
-            if bound then
-                pcall(function() RunService:UnbindFromRenderStep(AIMBOT_BIND_NAME) end)
-                bound = false
-                currentTarget = nil; currentTargetScore = math.huge; targetStickTime = 0
-                local char = LocalPlayer.Character
-                local hum = char and char:FindFirstChildOfClass("Humanoid")
-                if hum then hum.AutoRotate = true end
-            end
-        end
-    end)
-    bound = false
-end
+-- Single UI + aimbot step bind
+RunService:BindToRenderStep("OmarHubUI", Enum.RenderPriority.Camera.Value + 1, aimStep)
+bound = true
 
 track(LocalPlayer.CharacterAdded:Connect(function()
     task.wait(0.2)
@@ -1157,26 +1171,32 @@ local function setUIVisible(vis)
     AimPill.Visible = not vis
 end
 
-track(ToggleBtn.MouseButton1Click:Connect(function()
+local function hidePanel()
     local now = tick()
     if now - uiInputCooldown < 0.15 then return end
     uiInputCooldown = now
     setUIVisible(false)
-end))
+end
+
+local function showPanel() setUIVisible(true) end
+
+track(ToggleBtn.MouseButton1Click:Connect(hidePanel))
+
 track(UserInputService.InputBegan:Connect(function(input, gp)
     if gp then return end
     if input.KeyCode == Config.ToggleKey then
-        setUIVisible(not Main.Visible)
+        if Main.Visible then setUIVisible(false) else showPanel() end
     end
 end))
 
+-- ============ SHUTDOWN ============
 local function shutdown()
-    pcall(function() RunService:UnbindFromRenderStep(AIMBOT_BIND_NAME) end)
     pcall(function() RunService:UnbindFromRenderStep("OmarHubUI") end)
-    bound = false
-    -- restore workspace functions
     pcall(function() Workspace.Raycast = originalRaycast end)
     pcall(function() Workspace.RaycastAll = originalRaycastAll end)
+    pcall(function() Workspace.FindPartOnRay = originalFindPartOnRay end)
+    pcall(function() Workspace.FindPartOnRayWithIgnoreList = originalFindPartOnRayIgnore end)
+    bound = false
     local char = LocalPlayer.Character
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     if hum then hum.AutoRotate = true end
