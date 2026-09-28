@@ -1,0 +1,2 @@
+# Aim
+omar script
