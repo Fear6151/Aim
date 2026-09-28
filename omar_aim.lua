@@ -1,5 +1,12 @@
---// Aim Assist + ESP
---// For your own Roblox Studio experience
+--[[
+    PURPLE AIM + ESP
+    Roblox Studio Edition
+
+    Crate by, Omar
+
+    Place this LocalScript in:
+    StarterPlayer > StarterPlayerScripts
+]]
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -8,206 +15,1452 @@ local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
---// Settings
-local AimEnabled = false
-local ESPEnabled = false
-local AimFOV = 150
-local AimSmoothness = 0.15
+------------------------------------------------------------
+-- SETTINGS
+------------------------------------------------------------
 
---// UI
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "AimESP_UI"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+local Settings = {
+
+    -- AIM
+    AimEnabled = false,
+    Smoothness = 75,
+    FOV = 180,
+    TargetPart = "Head",
+
+    TeamCheck = true,
+    HoldToAim = false,
+    IgnoreDead = true,
+
+    -- Add teams that should never be targeted.
+    ExcludedTeams = {
+        -- ["Lobby"] = true,
+        -- ["Spectators"] = true,
+    },
+
+    -- ESP
+    ESPEnabled = false,
+
+    ESP = {
+        Box = true,
+        Name = true,
+        Distance = true,
+        Health = true,
+    }
+}
+
+------------------------------------------------------------
+-- COLORS
+------------------------------------------------------------
+
+local Colors = {
+    Background = Color3.fromRGB(9, 7, 13),
+    Panel = Color3.fromRGB(17, 13, 25),
+    Button = Color3.fromRGB(25, 19, 36),
+
+    Purple = Color3.fromRGB(145, 70, 255),
+    PurpleDark = Color3.fromRGB(80, 35, 150),
+
+    White = Color3.fromRGB(245, 245, 250),
+    Gray = Color3.fromRGB(155, 150, 165),
+
+    Red = Color3.fromRGB(215, 55, 65),
+}
+
+------------------------------------------------------------
+-- STATE
+------------------------------------------------------------
+
+local CurrentTarget = nil
+local RMBDown = false
+local MenuOpen = true
+
+local ESPObjects = {}
+
+------------------------------------------------------------
+-- SCREEN GUI
+------------------------------------------------------------
+
+local Gui = Instance.new("ScreenGui")
+Gui.Name = "PurpleAimESP"
+Gui.ResetOnSpawn = false
+Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+Gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+------------------------------------------------------------
+-- FOV CIRCLE
+------------------------------------------------------------
+
+local FOVCircle = Instance.new("Frame")
+
+FOVCircle.Name = "FOVCircle"
+FOVCircle.AnchorPoint = Vector2.new(0.5, 0.5)
+FOVCircle.Position = UDim2.fromScale(0.5, 0.5)
+
+FOVCircle.Size = UDim2.fromOffset(
+    Settings.FOV * 2,
+    Settings.FOV * 2
+)
+
+FOVCircle.BackgroundTransparency = 1
+FOVCircle.Visible = false
+FOVCircle.Parent = Gui
+
+local FOVCorner = Instance.new("UICorner")
+FOVCorner.CornerRadius = UDim.new(1, 0)
+FOVCorner.Parent = FOVCircle
+
+local FOVStroke = Instance.new("UIStroke")
+FOVStroke.Color = Colors.Purple
+FOVStroke.Thickness = 2
+FOVStroke.Transparency = 0.15
+FOVStroke.Parent = FOVCircle
+
+------------------------------------------------------------
+-- MAIN WINDOW
+------------------------------------------------------------
 
 local Main = Instance.new("Frame")
-Main.Size = UDim2.new(0, 220, 0, 130)
-Main.Position = UDim2.new(0, 20, 0.5, -65)
-Main.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-Main.BorderSizePixel = 0
-Main.Parent = ScreenGui
 
-local Corner = Instance.new("UICorner")
-Corner.CornerRadius = UDim.new(0, 10)
-Corner.Parent = Main
+Main.Name = "Main"
+Main.Size = UDim2.fromOffset(350, 470)
+Main.Position = UDim2.fromOffset(25, 160)
+
+Main.BackgroundColor3 = Colors.Background
+Main.BorderSizePixel = 0
+
+Main.Parent = Gui
+
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 14)
+MainCorner.Parent = Main
+
+local MainStroke = Instance.new("UIStroke")
+MainStroke.Color = Colors.PurpleDark
+MainStroke.Thickness = 1
+MainStroke.Parent = Main
+
+------------------------------------------------------------
+-- TITLE BAR
+------------------------------------------------------------
+
+local TitleBar = Instance.new("Frame")
+
+TitleBar.Size = UDim2.new(1, 0, 0, 48)
+TitleBar.BackgroundColor3 = Colors.Panel
+TitleBar.BorderSizePixel = 0
+
+TitleBar.Parent = Main
+
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 14)
+TitleCorner.Parent = TitleBar
 
 local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 35)
+
 Title.BackgroundTransparency = 1
-Title.Text = "Aim + ESP"
-Title.TextColor3 = Color3.new(1, 1, 1)
-Title.TextSize = 20
+Title.Position = UDim2.fromOffset(15, 0)
+Title.Size = UDim2.new(1, -100, 1, 0)
+
+Title.Text = "PURPLE  •  AIM + ESP"
+Title.TextColor3 = Colors.White
+Title.TextSize = 16
 Title.Font = Enum.Font.GothamBold
-Title.Parent = Main
+Title.TextXAlignment = Enum.TextXAlignment.Left
 
-local AimButton = Instance.new("TextButton")
-AimButton.Size = UDim2.new(0.85, 0, 0, 35)
-AimButton.Position = UDim2.new(0.075, 0, 0, 42)
-AimButton.Text = "Aim Assist: OFF"
-AimButton.TextColor3 = Color3.new(1, 1, 1)
-AimButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-AimButton.Font = Enum.Font.Gotham
-AimButton.TextSize = 14
-AimButton.Parent = Main
+Title.Parent = TitleBar
 
-local ESPButton = AimButton:Clone()
-ESPButton.Position = UDim2.new(0.075, 0, 0, 85)
-ESPButton.Text = "ESP: OFF"
-ESPButton.Parent = Main
+------------------------------------------------------------
+-- CLOSE BUTTON
+------------------------------------------------------------
 
---// Toggle buttons
-AimButton.MouseButton1Click:Connect(function()
-    AimEnabled = not AimEnabled
-    AimButton.Text = "Aim Assist: " .. (AimEnabled and "ON" or "OFF")
-end)
+local Close = Instance.new("TextButton")
 
-ESPButton.MouseButton1Click:Connect(function()
-    ESPEnabled = not ESPEnabled
-    ESPButton.Text = "ESP: " .. (ESPEnabled and "ON" or "OFF")
-end)
+Close.Size = UDim2.fromOffset(32, 30)
+Close.Position = UDim2.new(1, -40, 0, 9)
 
---// Find closest player
-local function GetClosestPlayer()
-    local closestPlayer = nil
-    local closestDistance = AimFOV
+Close.BackgroundColor3 = Colors.Red
+Close.Text = "×"
 
-    local mousePosition = UserInputService:GetMouseLocation()
+Close.TextColor3 = Colors.White
+Close.TextSize = 20
+Close.Font = Enum.Font.GothamBold
 
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
+Close.Parent = TitleBar
 
-            local character = player.Character
-            if character then
+local CloseCorner = Instance.new("UICorner")
+CloseCorner.CornerRadius = UDim.new(0, 8)
+CloseCorner.Parent = Close
 
-                local humanoid = character:FindFirstChildOfClass("Humanoid")
-                local head = character:FindFirstChild("Head")
+------------------------------------------------------------
+-- CONTENT
+------------------------------------------------------------
 
-                if humanoid and head and humanoid.Health > 0 then
+local Content = Instance.new("Frame")
 
-                    local screenPosition, visible =
-                        Camera:WorldToViewportPoint(head.Position)
+Content.Position = UDim2.fromOffset(12, 58)
+Content.Size = UDim2.new(1, -24, 1, -70)
 
-                    if visible then
-                        local distance = (
-                            Vector2.new(screenPosition.X, screenPosition.Y)
-                            - mousePosition
+Content.BackgroundTransparency = 1
+Content.Parent = Main
+
+local Layout = Instance.new("UIListLayout")
+
+Layout.Padding = UDim.new(0, 7)
+Layout.SortOrder = Enum.SortOrder.LayoutOrder
+
+Layout.Parent = Content
+
+------------------------------------------------------------
+-- BUTTON CREATOR
+------------------------------------------------------------
+
+local function CreateButton(Text)
+
+    local Button = Instance.new("TextButton")
+
+    Button.Size = UDim2.new(1, 0, 0, 37)
+
+    Button.BackgroundColor3 = Colors.Button
+    Button.BorderSizePixel = 0
+
+    Button.Text = Text
+    Button.TextColor3 = Colors.White
+    Button.TextSize = 13
+    Button.Font = Enum.Font.GothamMedium
+
+    Button.AutoButtonColor = false
+
+    Button.Parent = Content
+
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 8)
+    Corner.Parent = Button
+
+    local Stroke = Instance.new("UIStroke")
+
+    Stroke.Color = Colors.White
+    Stroke.Thickness = 1
+    Stroke.Transparency = 0.45
+
+    Stroke.Parent = Button
+
+    return Button, Stroke
+end
+
+------------------------------------------------------------
+-- BUTTON ACTIVE STYLE
+------------------------------------------------------------
+
+local function SetButtonState(
+    Button,
+    Stroke,
+    Active
+)
+
+    if Active then
+
+        Button.BackgroundColor3 =
+            Colors.Purple
+
+        Stroke.Color =
+            Colors.White
+
+        Stroke.Transparency = 0
+
+    else
+
+        Button.BackgroundColor3 =
+            Colors.Button
+
+        Stroke.Color =
+            Colors.White
+
+        Stroke.Transparency = 0.45
+    end
+end
+
+------------------------------------------------------------
+-- AIMBOT
+------------------------------------------------------------
+
+local AimButton, AimStroke =
+    CreateButton("AIMBOT  •  OFF")
+
+AimButton.MouseButton1Click:Connect(
+    function()
+
+        Settings.AimEnabled =
+            not Settings.AimEnabled
+
+        if not Settings.AimEnabled then
+            CurrentTarget = nil
+        end
+
+        AimButton.Text =
+            "AIMBOT  •  " ..
+            (
+                Settings.AimEnabled
+                and "ON"
+                or "OFF"
+            )
+
+        SetButtonState(
+            AimButton,
+            AimStroke,
+            Settings.AimEnabled
+        )
+    end
+)
+
+------------------------------------------------------------
+-- SMOOTHNESS
+------------------------------------------------------------
+
+local SmoothButton =
+    CreateButton("Smoothness  •  75%")
+
+SmoothButton.MouseButton1Click:Connect(
+    function()
+
+        Settings.Smoothness += 10
+
+        if Settings.Smoothness > 100 then
+            Settings.Smoothness = 0
+        end
+
+        SmoothButton.Text =
+            "Smoothness  •  " ..
+            Settings.Smoothness .. "%"
+    end
+)
+
+------------------------------------------------------------
+-- FOV SIZE
+------------------------------------------------------------
+
+local FOVButton =
+    CreateButton("Aim FOV  •  180")
+
+FOVButton.MouseButton1Click:Connect(
+    function()
+
+        Settings.FOV += 30
+
+        if Settings.FOV > 500 then
+            Settings.FOV = 60
+        end
+
+        FOVButton.Text =
+            "Aim FOV  •  " ..
+            Settings.FOV
+
+        FOVCircle.Size =
+            UDim2.fromOffset(
+                Settings.FOV * 2,
+                Settings.FOV * 2
+            )
+    end
+)
+
+------------------------------------------------------------
+-- FOV CIRCLE
+------------------------------------------------------------
+
+local FOVToggle, FOVToggleStroke =
+    CreateButton("FOV Circle  •  OFF")
+
+FOVToggle.MouseButton1Click:Connect(
+    function()
+
+        FOVCircle.Visible =
+            not FOVCircle.Visible
+
+        FOVToggle.Text =
+            "FOV Circle  •  " ..
+            (
+                FOVCircle.Visible
+                and "ON"
+                or "OFF"
+            )
+
+        SetButtonState(
+            FOVToggle,
+            FOVToggleStroke,
+            FOVCircle.Visible
+        )
+    end
+)
+
+------------------------------------------------------------
+-- TARGET PART
+------------------------------------------------------------
+
+local TargetButton =
+    CreateButton("Target Part  •  HEAD")
+
+TargetButton.MouseButton1Click:Connect(
+    function()
+
+        if Settings.TargetPart == "Head" then
+
+            Settings.TargetPart =
+                "HumanoidRootPart"
+
+        else
+
+            Settings.TargetPart =
+                "Head"
+        end
+
+        TargetButton.Text =
+            "Target Part  •  " ..
+            string.upper(
+                Settings.TargetPart
+            )
+
+        CurrentTarget = nil
+    end
+)
+
+------------------------------------------------------------
+-- TEAM CHECK
+------------------------------------------------------------
+
+local TeamButton, TeamStroke =
+    CreateButton("Team Check  •  ON")
+
+TeamButton.MouseButton1Click:Connect(
+    function()
+
+        Settings.TeamCheck =
+            not Settings.TeamCheck
+
+        TeamButton.Text =
+            "Team Check  •  " ..
+            (
+                Settings.TeamCheck
+                and "ON"
+                or "OFF"
+            )
+
+        SetButtonState(
+            TeamButton,
+            TeamStroke,
+            Settings.TeamCheck
+        )
+
+        CurrentTarget = nil
+    end
+)
+
+------------------------------------------------------------
+-- HOLD RMB
+------------------------------------------------------------
+
+local HoldButton, HoldStroke =
+    CreateButton("Hold RMB  •  OFF")
+
+HoldButton.MouseButton1Click:Connect(
+    function()
+
+        Settings.HoldToAim =
+            not Settings.HoldToAim
+
+        HoldButton.Text =
+            "Hold RMB  •  " ..
+            (
+                Settings.HoldToAim
+                and "ON"
+                or "OFF"
+            )
+
+        SetButtonState(
+            HoldButton,
+            HoldStroke,
+            Settings.HoldToAim
+        )
+
+        CurrentTarget = nil
+    end
+)
+
+------------------------------------------------------------
+-- ESP MAIN TOGGLE
+------------------------------------------------------------
+
+local ESPButton, ESPStroke =
+    CreateButton("ESP  •  OFF")
+
+ESPButton.MouseButton1Click:Connect(
+    function()
+
+        Settings.ESPEnabled =
+            not Settings.ESPEnabled
+
+        ESPButton.Text =
+            "ESP  •  " ..
+            (
+                Settings.ESPEnabled
+                and "ON"
+                or "OFF"
+            )
+
+        SetButtonState(
+            ESPButton,
+            ESPStroke,
+            Settings.ESPEnabled
+        )
+    end
+)
+
+------------------------------------------------------------
+-- ESP BOX
+------------------------------------------------------------
+
+local BoxButton, BoxStroke =
+    CreateButton("ESP Box  •  ON")
+
+BoxButton.MouseButton1Click:Connect(
+    function()
+
+        Settings.ESP.Box =
+            not Settings.ESP.Box
+
+        BoxButton.Text =
+            "ESP Box  •  " ..
+            (
+                Settings.ESP.Box
+                and "ON"
+                or "OFF"
+            )
+
+        SetButtonState(
+            BoxButton,
+            BoxStroke,
+            Settings.ESP.Box
+        )
+    end
+)
+
+------------------------------------------------------------
+-- ESP NAME + DISTANCE
+------------------------------------------------------------
+
+local NameButton, NameStroke =
+    CreateButton(
+        "ESP Name + Distance  •  ON"
+    )
+
+NameButton.MouseButton1Click:Connect(
+    function()
+
+        local NewState =
+            not Settings.ESP.Name
+
+        Settings.ESP.Name =
+            NewState
+
+        Settings.ESP.Distance =
+            NewState
+
+        NameButton.Text =
+            "ESP Name + Distance  •  " ..
+            (
+                NewState
+                and "ON"
+                or "OFF"
+            )
+
+        SetButtonState(
+            NameButton,
+            NameStroke,
+            NewState
+        )
+    end
+)
+
+------------------------------------------------------------
+-- ESP HEALTH
+------------------------------------------------------------
+
+local HealthButton, HealthStroke =
+    CreateButton("ESP Health  •  ON")
+
+HealthButton.MouseButton1Click:Connect(
+    function()
+
+        Settings.ESP.Health =
+            not Settings.ESP.Health
+
+        HealthButton.Text =
+            "ESP Health  •  " ..
+            (
+                Settings.ESP.Health
+                and "ON"
+                or "OFF"
+            )
+
+        SetButtonState(
+            HealthButton,
+            HealthStroke,
+            Settings.ESP.Health
+        )
+    end
+)
+
+------------------------------------------------------------
+-- CREDIT
+------------------------------------------------------------
+
+local Credit = Instance.new("TextLabel")
+
+Credit.Size =
+    UDim2.new(1, 0, 0, 25)
+
+Credit.BackgroundTransparency = 1
+
+Credit.Text = "Crate by, Omar"
+
+Credit.TextColor3 =
+    Colors.Gray
+
+Credit.TextSize = 11
+Credit.Font = Enum.Font.GothamMedium
+
+Credit.Parent = Content
+
+------------------------------------------------------------
+-- TARGET VALIDATION
+------------------------------------------------------------
+
+local function IsValidTarget(Player)
+
+    if Player == LocalPlayer then
+        return false
+    end
+
+    --------------------------------------------------------
+    -- TEAM CHECK
+    --------------------------------------------------------
+
+    if Settings.TeamCheck then
+
+        if Player.Team == LocalPlayer.Team then
+            return false
+        end
+    end
+
+    --------------------------------------------------------
+    -- EXCLUDED TEAMS
+    --------------------------------------------------------
+
+    if Player.Team then
+
+        if Settings.ExcludedTeams[
+            Player.Team.Name
+        ] then
+
+            return false
+        end
+    end
+
+    --------------------------------------------------------
+    -- CHARACTER
+    --------------------------------------------------------
+
+    local Character =
+        Player.Character
+
+    if not Character then
+        return false
+    end
+
+    --------------------------------------------------------
+    -- HUMANOID
+    --------------------------------------------------------
+
+    local Humanoid =
+        Character:FindFirstChildOfClass(
+            "Humanoid"
+        )
+
+    if not Humanoid then
+        return false
+    end
+
+    if Settings.IgnoreDead
+        and Humanoid.Health <= 0 then
+
+        return false
+    end
+
+    --------------------------------------------------------
+    -- TARGET PART
+    --------------------------------------------------------
+
+    if not Character:FindFirstChild(
+        Settings.TargetPart
+    ) then
+
+        return false
+    end
+
+    return true
+end
+
+------------------------------------------------------------
+-- FIND CLOSEST TARGET
+------------------------------------------------------------
+
+local function GetClosestTarget()
+
+    local MousePosition =
+        UserInputService:GetMouseLocation()
+
+    local Closest = nil
+    local ClosestDistance =
+        Settings.FOV
+
+    for _, Player in ipairs(
+        Players:GetPlayers()
+    ) do
+
+        if IsValidTarget(Player) then
+
+            local Character =
+                Player.Character
+
+            local Part =
+                Character:FindFirstChild(
+                    Settings.TargetPart
+                )
+
+            if Part then
+
+                local ScreenPosition, Visible =
+                    Camera:WorldToViewportPoint(
+                        Part.Position
+                    )
+
+                if Visible
+                    and ScreenPosition.Z > 0 then
+
+                    local Distance =
+                        (
+                            Vector2.new(
+                                ScreenPosition.X,
+                                ScreenPosition.Y
+                            )
+                            - MousePosition
                         ).Magnitude
 
-                        if distance < closestDistance then
-                            closestDistance = distance
-                            closestPlayer = player
-                        end
+                    if Distance <
+                        ClosestDistance then
+
+                        ClosestDistance =
+                            Distance
+
+                        Closest = Player
                     end
                 end
             end
         end
     end
 
-    return closestPlayer
+    return Closest
 end
 
---// Aim Assist
-RunService.RenderStepped:Connect(function()
+------------------------------------------------------------
+-- AIM
+------------------------------------------------------------
 
-    if AimEnabled then
+local function AimAt(Player)
 
-        local target = GetClosestPlayer()
-
-        if target and target.Character then
-
-            local head = target.Character:FindFirstChild("Head")
-
-            if head then
-                local targetCFrame =
-                    CFrame.new(Camera.CFrame.Position, head.Position)
-
-                Camera.CFrame =
-                    Camera.CFrame:Lerp(targetCFrame, AimSmoothness)
-            end
-        end
-    end
-end)
-
---// ESP
-local ESPObjects = {}
-
-local function CreateESP(player)
-
-    if player == LocalPlayer then
+    if not Player then
         return
     end
-local highlight = Instance.new("Highlight")
-    highlight.Name = "ESP"
-    highlight.FillTransparency = 0.65
-    highlight.OutlineTransparency = 0
-    highlight.FillColor = Color3.fromRGB(255, 0, 0)
-    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-    highlight.Enabled = false
-    highlight.Parent = workspace
 
-    ESPObjects[player] = highlight
+    if not IsValidTarget(Player) then
+        return
+    end
+
+    local Character =
+        Player.Character
+
+    local Part =
+        Character:FindFirstChild(
+            Settings.TargetPart
+        )
+
+    if not Part then
+        return
+    end
+
+    local Desired =
+        CFrame.lookAt(
+            Camera.CFrame.Position,
+            Part.Position
+        )
+
+    local Strength =
+        Settings.Smoothness / 100
+
+    -- Higher smoothness = stronger tracking.
+    -- 100% remains interpolated rather than
+    -- directly snapping the camera.
+
+    local Alpha =
+        0.025 +
+        ((Strength ^ 2) * 0.93)
+
+    Camera.CFrame =
+        Camera.CFrame:Lerp(
+            Desired,
+            math.clamp(
+                Alpha,
+                0,
+                0.98
+            )
+        )
 end
 
-local function RemoveESP(player)
+------------------------------------------------------------
+-- ESP CREATION
+------------------------------------------------------------
 
-    if ESPObjects[player] then
-        ESPObjects[player]:Destroy()
-        ESPObjects[player] = nil
+local function CreateESP(Player)
+
+    if Player == LocalPlayer then
+        return
+    end
+
+    if ESPObjects[Player] then
+        return
+    end
+
+    local Billboard =
+        Instance.new("BillboardGui")
+
+    Billboard.Name = "PlayerESP"
+
+    Billboard.Size =
+        UDim2.fromOffset(170, 75)
+
+    Billboard.StudsOffset =
+        Vector3.new(0, 2.8, 0)
+
+    Billboard.AlwaysOnTop = true
+    Billboard.Enabled = false
+
+    Billboard.Parent = Gui
+
+    --------------------------------------------------------
+    -- NAME
+    --------------------------------------------------------
+
+    local Name =
+        Instance.new("TextLabel")
+
+    Name.Name = "Name"
+
+    Name.Size =
+        UDim2.new(1, 0, 0, 20)
+
+    Name.BackgroundTransparency = 1
+
+    Name.TextColor3 =
+        Colors.White
+
+    Name.TextStrokeTransparency = 0.2
+
+    Name.TextSize = 14
+    Name.Font = Enum.Font.GothamBold
+
+    Name.Parent = Billboard
+
+    --------------------------------------------------------
+    -- DISTANCE
+    --------------------------------------------------------
+
+    local Distance =
+        Instance.new("TextLabel")
+
+    Distance.Name = "Distance"
+
+    Distance.Position =
+        UDim2.fromOffset(0, 20)
+
+    Distance.Size =
+        UDim2.new(1, 0, 0, 18)
+
+    Distance.BackgroundTransparency = 1
+
+    Distance.TextColor3 =
+        Colors.Gray
+
+    Distance.TextStrokeTransparency = 0.35
+
+    Distance.TextSize = 11
+    Distance.Font = Enum.Font.GothamMedium
+
+    Distance.Parent = Billboard
+
+    --------------------------------------------------------
+    -- HEALTH BACKGROUND
+    --------------------------------------------------------
+
+    local HealthBackground =
+        Instance.new("Frame")
+
+    HealthBackground.Name =
+        "HealthBackground"
+
+    HealthBackground.Position =
+        UDim2.fromOffset(25, 43)
+
+    HealthBackground.Size =
+        UDim2.new(1, -50, 0, 6)
+
+    HealthBackground.BackgroundColor3 =
+        Color3.fromRGB(35, 35, 40)
+
+    HealthBackground.BorderSizePixel = 0
+
+    HealthBackground.Parent = Billboard
+
+    local HealthCorner =
+        Instance.new("UICorner")
+
+    HealthCorner.CornerRadius =
+        UDim.new(1, 0)
+
+    HealthCorner.Parent =
+        HealthBackground
+
+    --------------------------------------------------------
+    -- HEALTH FILL
+    --------------------------------------------------------
+
+    local HealthFill =
+        Instance.new("Frame")
+
+    HealthFill.Name =
+        "HealthFill"
+
+    HealthFill.Size =
+        UDim2.fromScale(1, 1)
+
+    HealthFill.BackgroundColor3 =
+        Colors.Purple
+
+    HealthFill.BorderSizePixel = 0
+
+    HealthFill.Parent =
+        HealthBackground
+
+    local HealthFillCorner =
+        Instance.new("UICorner")
+
+    HealthFillCorner.CornerRadius =
+        UDim.new(1, 0)
+
+    HealthFillCorner.Parent =
+        HealthFill
+
+    --------------------------------------------------------
+    -- BOX
+    --------------------------------------------------------
+
+    local Box =
+        Instance.new("Frame")
+
+    Box.Name = "Box"
+
+    Box.AnchorPoint =
+        Vector2.new(0.5, 0.5)
+
+    Box.Position =
+        UDim2.fromScale(0.5, 0.5)
+
+    Box.Size =
+        UDim2.fromOffset(70, 100)
+
+    Box.BackgroundTransparency = 1
+
+    Box.Parent = Billboard
+
+    local BoxStroke =
+        Instance.new("UIStroke")
+
+    BoxStroke.Color =
+        Colors.Purple
+
+    BoxStroke.Thickness = 1.5
+
+    BoxStroke.Parent = Box
+
+    --------------------------------------------------------
+    -- SAVE
+    --------------------------------------------------------
+
+    ESPObjects[Player] = {
+
+        Gui = Billboard,
+
+        Name = Name,
+        Distance = Distance,
+
+        HealthBackground =
+            HealthBackground,
+
+        HealthFill =
+            HealthFill,
+
+        Box = Box,
+    }
+end
+
+------------------------------------------------------------
+-- REMOVE ESP
+------------------------------------------------------------
+
+local function RemoveESP(Player)
+
+    local Data =
+        ESPObjects[Player]
+
+    if Data then
+
+        Data.Gui:Destroy()
+
+        ESPObjects[Player] = nil
     end
 end
 
-for _, player in ipairs(Players:GetPlayers()) do
-    CreateESP(player)
+------------------------------------------------------------
+-- CREATE ESP FOR EXISTING PLAYERS
+------------------------------------------------------------
+
+for _, Player in ipairs(
+    Players:GetPlayers()
+) do
+
+    CreateESP(Player)
 end
 
-Players.PlayerAdded:Connect(CreateESP)
-Players.PlayerRemoving:Connect(RemoveESP)
+Players.PlayerAdded:Connect(
+    CreateESP
+)
 
-RunService.RenderStepped:Connect(function()
+Players.PlayerRemoving:Connect(
+    RemoveESP
+)
 
-    for player, highlight in pairs(ESPObjects) do
+------------------------------------------------------------
+-- UPDATE ESP
+------------------------------------------------------------
 
-        if ESPEnabled and player.Character then
-            highlight.Adornee = player.Character
-            highlight.Enabled = true
-        else
-            highlight.Enabled = false
+local function UpdateESP(
+    Player,
+    Data
+)
+
+    --------------------------------------------------------
+    -- MASTER ESP TOGGLE
+    --------------------------------------------------------
+
+    if not Settings.ESPEnabled then
+
+        Data.Gui.Enabled = false
+        return
+    end
+
+    --------------------------------------------------------
+    -- CHARACTER
+    --------------------------------------------------------
+
+    local Character =
+        Player.Character
+
+    if not Character then
+
+        Data.Gui.Enabled = false
+        return
+    end
+
+    local Head =
+        Character:FindFirstChild(
+            "Head"
+        )
+
+    local Root =
+        Character:FindFirstChild(
+            "HumanoidRootPart"
+        )
+
+    local Humanoid =
+        Character:FindFirstChildOfClass(
+            "Humanoid"
+        )
+
+    if not Head
+        or not Root
+        or not Humanoid then
+
+        Data.Gui.Enabled = false
+        return
+    end
+
+    if Settings.IgnoreDead
+        and Humanoid.Health <= 0 then
+
+        Data.Gui.Enabled = false
+        return
+    end
+
+    --------------------------------------------------------
+    -- ENABLE
+    --------------------------------------------------------
+
+    Data.Gui.Adornee =
+        Head
+
+    Data.Gui.Enabled = true
+
+    --------------------------------------------------------
+    -- NAME
+    --------------------------------------------------------
+
+    Data.Name.Visible =
+        Settings.ESP.Name
+
+    Data.Name.Text =
+        Player.DisplayName ..
+        "  [" ..
+        Player.Name ..
+        "]"
+
+    --------------------------------------------------------
+    -- DISTANCE
+    --------------------------------------------------------
+
+    Data.Distance.Visible =
+        Settings.ESP.Distance
+
+    local MyCharacter =
+        LocalPlayer.Character
+
+    local MyRoot =
+        MyCharacter and
+        MyCharacter:FindFirstChild(
+            "HumanoidRootPart"
+        )
+
+    if MyRoot then
+
+        local Distance =
+            (
+                Root.Position -
+                MyRoot.Position
+            ).Magnitude
+
+        Data.Distance.Text =
+            math.floor(
+                Distance
+            ) .. " studs"
+    end
+
+    --------------------------------------------------------
+    -- HEALTH
+    --------------------------------------------------------
+
+    Data.HealthBackground.Visible =
+        Settings.ESP.Health
+
+    local HealthPercent =
+        math.clamp(
+            Humanoid.Health /
+            Humanoid.MaxHealth,
+            0,
+            1
+        )
+
+    Data.HealthFill.Size =
+        UDim2.fromScale(
+            HealthPercent,
+            1
+        )
+
+    --------------------------------------------------------
+    -- BOX
+    --------------------------------------------------------
+
+    Data.Box.Visible =
+        Settings.ESP.Box
+end
+
+------------------------------------------------------------
+-- MOUSE INPUT
+------------------------------------------------------------
+
+UserInputService.InputBegan:Connect(
+    function(Input, Processed)
+
+        if Processed then
+            return
+        end
+
+        if Input.UserInputType ==
+            Enum.UserInputType.MouseButton2 then
+
+            RMBDown = true
         end
     end
-end)
+)
 
---// Make UI draggable
-local dragging = false
-local dragStart
-local startPosition
+UserInputService.InputEnded:Connect(
+    function(Input)
 
-Main.InputBegan:Connect(function(input)
+        if Input.UserInputType ==
+            Enum.UserInputType.MouseButton2 then
 
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = true
-        dragStart = input.Position
-        startPosition = Main.Position
+            RMBDown = false
+        end
     end
-end)
+)
 
-UserInputService.InputChanged:Connect(function(input)
+------------------------------------------------------------
+-- DRAGGABLE WINDOW
+------------------------------------------------------------
 
-    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+local Dragging = false
+local DragStart
+local StartPosition
 
-        local delta = input.Position - dragStart
+TitleBar.InputBegan:Connect(
+    function(Input)
 
-        Main.Position = UDim2.new(
-            startPosition.X.Scale,
-            startPosition.X.Offset + delta.X,
-            startPosition.Y.Scale,
-            startPosition.Y.Offset + delta.Y
-        )
+        if Input.UserInputType ==
+            Enum.UserInputType.MouseButton1 then
+
+            Dragging = true
+
+            DragStart =
+                Input.Position
+
+            StartPosition =
+                Main.Position
+        end
     end
-end)
+)
 
-UserInputService.InputEnded:Connect(function(input)
+UserInputService.InputChanged:Connect(
+    function(Input)
 
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = false
+        if Dragging
+            and Input.UserInputType ==
+                Enum.UserInputType.MouseMovement then
+
+            local Delta =
+                Input.Position -
+                DragStart
+
+            Main.Position =
+                UDim2.new(
+
+                    StartPosition.X.Scale,
+
+                    StartPosition.X.Offset +
+                        Delta.X,
+
+                    StartPosition.Y.Scale,
+
+                    StartPosition.Y.Offset +
+                        Delta.Y
+                )
+        end
     end
-end)
+)
+
+UserInputService.InputEnded:Connect(
+    function(Input)
+
+        if Input.UserInputType ==
+            Enum.UserInputType.MouseButton1 then
+
+            Dragging = false
+        end
+    end
+)
+
+------------------------------------------------------------
+-- OPEN BUTTON
+------------------------------------------------------------
+
+local Reopen =
+    Instance.new("TextButton")
+
+Reopen.Size =
+    UDim2.fromOffset(75, 36)
+
+Reopen.Position =
+    UDim2.fromOffset(20, 20)
+
+Reopen.BackgroundColor3 =
+    Colors.Panel
+
+Reopen.Text = "OPEN"
+
+Reopen.TextColor3 =
+    Colors.White
+
+Reopen.TextSize = 12
+Reopen.Font = Enum.Font.GothamBold
+
+Reopen.Visible = false
+
+Reopen.Parent = Gui
+
+local ReopenCorner =
+    Instance.new("UICorner")
+
+ReopenCorner.CornerRadius =
+    UDim.new(0, 8)
+
+ReopenCorner.Parent =
+    Reopen
+
+local ReopenStroke =
+    Instance.new("UIStroke")
+
+ReopenStroke.Color =
+    Colors.Purple
+
+ReopenStroke.Thickness = 1
+
+ReopenStroke.Parent =
+    Reopen
+
+------------------------------------------------------------
+-- CLOSE / REOPEN
+------------------------------------------------------------
+
+Close.MouseButton1Click:Connect(
+    function()
+
+        Main.Visible = false
+        Reopen.Visible = true
+        MenuOpen = false
+    end
+)
+
+Reopen.MouseButton1Click:Connect(
+    function()
+
+        Main.Visible = true
+        Reopen.Visible = false
+        MenuOpen = true
+    end
+)
+
+------------------------------------------------------------
+-- INSERT = HIDE / SHOW
+------------------------------------------------------------
+
+UserInputService.InputBegan:Connect(
+    function(Input, Processed)
+
+        if Processed then
+            return
+        end
+
+        if Input.KeyCode ==
+            Enum.KeyCode.Insert then
+
+            MenuOpen =
+                not MenuOpen
+
+            Main.Visible =
+                MenuOpen
+
+            Reopen.Visible =
+                not MenuOpen
+        end
+    end
+)
+
+------------------------------------------------------------
+-- MAIN LOOP
+------------------------------------------------------------
+
+RunService.RenderStepped:Connect(
+    function()
+
+        ----------------------------------------------------
+        -- AIM
+        ----------------------------------------------------
+
+        if Settings.AimEnabled then
+
+            local ShouldAim = true
+
+            if Settings.HoldToAim then
+
+                ShouldAim =
+                    RMBDown
+            end
+
+            if ShouldAim then
+
+                -- Keep the current target while valid.
+                -- This prevents unnecessary switching.
+
+                if not CurrentTarget
+                    or not IsValidTarget(
+                        CurrentTarget
+                    ) then
+
+                    CurrentTarget =
+                        GetClosestTarget()
+                end
+
+                if CurrentTarget then
+
+                    AimAt(
+                        CurrentTarget
+                    )
+                end
+
+            else
+
+                CurrentTarget = nil
+            end
+
+        else
+
+            CurrentTarget = nil
+        end
+
+        ----------------------------------------------------
+        -- ESP
+        ----------------------------------------------------
+
+        for Player, Data in pairs(
+            ESPObjects
+        ) do
+
+            UpdateESP(
+                Player,
+                Data
+            )
+        end
+    end
+)
+
+------------------------------------------------------------
+-- DONE
+------------------------------------------------------------
+
+print(
+    "Aim + ESP loaded | Crate by, Omar"
+)
