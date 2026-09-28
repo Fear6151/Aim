@@ -1,5 +1,5 @@
 --[[
-    Omar Hub v29 — Native Roblox ESP (no Drawing API)
+    Omar Hub v31
     Credit: Made by Omar
     For use ONLY in your own Roblox game.
 --]]
@@ -11,7 +11,8 @@ local Workspace        = game:GetService("Workspace")
 local Camera           = Workspace.CurrentCamera
 local LocalPlayer      = Players.LocalPlayer
 
-print("[OmarHub] Starting v29")
+local function log(m) pcall(function() print("[OmarHub] " .. m) end) end
+log("=== Starting v31 ===")
 
 -- ============ CONFIG ============
 local Config = {
@@ -31,16 +32,32 @@ local Config = {
 }
 
 local connections = {}
-local function track(c) table.insert(connections, c); return c end
+local function track(c)
+    if c then table.insert(connections, c) end
+    return c
+end
+local function safeConnect(signal, fn)
+    local ok, conn = pcall(function() return signal:Connect(fn) end)
+    if ok and conn then
+        table.insert(connections, conn)
+        return conn
+    end
+    log("Failed to connect a signal")
+    return nil
+end
 local mouseHeld = false
 
 -- ============ UI ============
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "OmarHub"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.IgnoreGuiInset = true
-ScreenGui.DisplayOrder = 999
-ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+local ScreenGui
+pcall(function()
+    ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "OmarHub"
+    ScreenGui.ResetOnSpawn = false
+    ScreenGui.IgnoreGuiInset = true
+    ScreenGui.DisplayOrder = 999
+    ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+end)
+log("ScreenGui created")
 
 local Main = Instance.new("Frame")
 Main.Size = UDim2.new(0, 260, 0, 380)
@@ -97,33 +114,33 @@ CloseBtn.BorderSizePixel = 0
 CloseBtn.Parent = TitleBar
 Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
 
--- Drag
+-- Drag main panel
 do
     local dragging, dragStart, startPos = false, nil, nil
-    track(TitleBar.InputBegan:Connect(function(input)
+    safeConnect(TitleBar.InputBegan, function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1
         or input.UserInputType == Enum.UserInputType.Touch then
             dragging, dragStart, startPos = true, input.Position, Main.Position
         end
-    end))
+    end)
     local function move(input)
         if not dragging then return end
         local d = input.Position - dragStart
         Main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X,
                                   startPos.Y.Scale, startPos.Y.Offset + d.Y)
     end
-    track(TitleBar.InputChanged:Connect(function(i)
+    safeConnect(TitleBar.InputChanged, function(i)
         if i.UserInputType == Enum.UserInputType.MouseMovement
         or i.UserInputType == Enum.UserInputType.Touch then move(i) end
-    end))
-    track(UserInputService.InputChanged:Connect(function(i)
+    end)
+    safeConnect(UserInputService.InputChanged, function(i)
         if i.UserInputType == Enum.UserInputType.MouseMovement
         or i.UserInputType == Enum.UserInputType.Touch then move(i) end
-    end))
-    track(UserInputService.InputEnded:Connect(function(i)
+    end)
+    safeConnect(UserInputService.InputEnded, function(i)
         if i.UserInputType == Enum.UserInputType.MouseButton1
         or i.UserInputType == Enum.UserInputType.Touch then dragging = false end
-    end))
+    end)
 end
 
 -- Tabs
@@ -199,9 +216,9 @@ local function setActiveTab(which)
     end
 end
 setActiveTab("aim")
-track(AimTabBtn.MouseButton1Click:Connect(function() setActiveTab("aim") end))
-track(SilentTabBtn.MouseButton1Click:Connect(function() setActiveTab("silent") end))
-track(EspTabBtn.MouseButton1Click:Connect(function() setActiveTab("esp") end))
+safeConnect(AimTabBtn.MouseButton1Click, function() setActiveTab("aim") end)
+safeConnect(SilentTabBtn.MouseButton1Click, function() setActiveTab("silent") end)
+safeConnect(EspTabBtn.MouseButton1Click, function() setActiveTab("esp") end)
 
 -- ============ WIDGETS ============
 local function makeToggle(parent, text, yPos, default, callback)
@@ -238,12 +255,12 @@ local function makeToggle(parent, text, yPos, default, callback)
     Instance.new("UICorner", Knob).CornerRadius = UDim.new(1, 0)
 
     local state = default
-    track(Btn.MouseButton1Click:Connect(function()
+    safeConnect(Btn.MouseButton1Click, function()
         state = not state
         Pill.BackgroundColor3 = state and Color3.fromRGB(150, 70, 220) or Color3.fromRGB(60, 40, 80)
         Knob.Position = state and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
-        callback(state)
-    end))
+        pcall(callback, state)
+    end)
     return Btn
 end
 
@@ -281,15 +298,15 @@ local function makeSwitch(parent, text, yPos, options, default, callback)
         b.Font = Enum.Font.GothamBold; b.TextSize = 11
         b.BorderSizePixel = 0; b.Parent = Container
         Instance.new("UICorner", b).CornerRadius = UDim.new(0, 4)
-        track(b.MouseButton1Click:Connect(function()
+        safeConnect(b.MouseButton1Click, function()
             for _, other in ipairs(Container:GetChildren()) do
                 if other:IsA("TextButton") then
                     other.BackgroundColor3 = Color3.fromRGB(50, 30, 70)
                 end
             end
             b.BackgroundColor3 = Color3.fromRGB(150, 70, 220)
-            callback(opt)
-        end))
+            pcall(callback, opt)
+        end)
     end
     return Frame
 end
@@ -323,24 +340,24 @@ local function makeSlider(parent, text, yPos, min, max, default, callback)
     Instance.new("UICorner", Fill).CornerRadius = UDim.new(0, 7)
 
     local dragging = false
-    track(Bar.InputBegan:Connect(function(i)
+    safeConnect(Bar.InputBegan, function(i)
         if i.UserInputType == Enum.UserInputType.MouseButton1
         or i.UserInputType == Enum.UserInputType.Touch then dragging = true end
-    end))
-    track(UserInputService.InputEnded:Connect(function(i)
+    end)
+    safeConnect(UserInputService.InputEnded, function(i)
         if i.UserInputType == Enum.UserInputType.MouseButton1
         or i.UserInputType == Enum.UserInputType.Touch then dragging = false end
-    end))
-    track(UserInputService.InputChanged:Connect(function(i)
+    end)
+    safeConnect(UserInputService.InputChanged, function(i)
         if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement
         or i.UserInputType == Enum.UserInputType.Touch) then
             local rel = math.clamp((i.Position.X - Bar.AbsolutePosition.X) / Bar.AbsoluteSize.X, 0, 1)
             Fill.Size = UDim2.new(rel, 0, 1, 0)
             local val = math.floor(min + (max - min) * rel)
             Lbl.Text = text .. ": " .. val
-            callback(val)
+            pcall(callback, val)
         end
-    end))
+    end)
     return Frame
 end
 
@@ -380,10 +397,9 @@ Credit.Text = "Made by Omar"
 Credit.TextColor3 = Color3.fromRGB(180, 100, 240)
 Credit.Font = Enum.Font.GothamBold; Credit.TextSize = 12
 Credit.Parent = Main
+log("UI built")
 
-print("[OmarHub] UI built")
-
--- ============ FOV RINGS (Frames — always work) ============
+-- ============ FOV RINGS ============
 local FovRing = Instance.new("Frame")
 FovRing.AnchorPoint = Vector2.new(0.5, 0.5)
 FovRing.BackgroundTransparency = 1
@@ -407,8 +423,7 @@ Instance.new("UICorner", SilentRing).CornerRadius = UDim.new(1, 0)
 local SilentStroke = Instance.new("UIStroke", SilentRing)
 SilentStroke.Color = Color3.fromRGB(120, 220, 255)
 SilentStroke.Thickness = 2
-
-print("[OmarHub] Rings built")
+log("Rings built")
 
 -- ============ OMAR PILL ============
 local FloatPill = Instance.new("TextButton")
@@ -429,7 +444,6 @@ local PillStroke = Instance.new("UIStroke", FloatPill)
 PillStroke.Color = Color3.fromRGB(150, 70, 220)
 PillStroke.Thickness = 1.5
 
--- Pill drag
 do
     local dragging, moved, dragStart, startPos = false, false, nil, nil
     local function clamp(pos)
@@ -440,13 +454,13 @@ do
         return UDim2.new(0, math.clamp(pos.X.Offset, 0, vp.X - w),
                          0, math.clamp(pos.Y.Offset, 0, vp.Y - h))
     end
-    track(FloatPill.InputBegan:Connect(function(input)
+    safeConnect(FloatPill.InputBegan, function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1
         or input.UserInputType == Enum.UserInputType.Touch then
             dragging, moved, dragStart, startPos = true, false, input.Position, FloatPill.Position
         end
-    end))
-    track(UserInputService.InputChanged:Connect(function(input)
+    end)
+    safeConnect(UserInputService.InputChanged, function(input)
         if not dragging then return end
         if input.UserInputType == Enum.UserInputType.MouseMovement
         or input.UserInputType == Enum.UserInputType.Touch then
@@ -455,8 +469,8 @@ do
             FloatPill.Position = clamp(UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X,
                                                  startPos.Y.Scale, startPos.Y.Offset + d.Y))
         end
-    end))
-    track(UserInputService.InputEnded:Connect(function(input)
+    end)
+    safeConnect(UserInputService.InputEnded, function(input)
         if not dragging then return end
         if input.UserInputType == Enum.UserInputType.MouseButton1
         or input.UserInputType == Enum.UserInputType.Touch then
@@ -466,8 +480,9 @@ do
             end
             dragging, moved = false, false
         end
-    end))
+    end)
 end
+log("Pill built")
 
 -- ============ HELPERS ============
 local function isTeammate(player, teamCheckOn)
@@ -524,89 +539,84 @@ local function getCharTargets(teamCheckOn)
     end
     return out
 end
+log("Helpers ready")
 
-print("[OmarHub] Helpers ready")
-
--- ============ NATIVE ESP (Highlight + BillboardGui) ============
-local espObjects = {}  -- character -> { hl, bb, nameLabel, distLabel, hpBar, hpBarBg, boxFrame }
+-- ============ ESP (Highlight + Billboard) ============
+local espObjects = {}
 
 local function createNativeESP(character)
     if espObjects[character] then return end
+    local ok, err = pcall(function()
+        local hl = Instance.new("Highlight")
+        hl.Name = "OmarHL"
+        hl.FillColor = Color3.fromRGB(120, 50, 200)
+        hl.FillTransparency = 0.7
+        hl.OutlineColor = Color3.fromRGB(200, 130, 255)
+        hl.OutlineTransparency = 0
+        hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        hl.Adornee = character
+        hl.Parent = ScreenGui
 
-    local hl = Instance.new("Highlight")
-    hl.Name = "OmarHL"
-    hl.FillColor = Color3.fromRGB(120, 50, 200)
-    hl.FillTransparency = 0.7
-    hl.OutlineColor = Color3.fromRGB(200, 130, 255)
-    hl.OutlineTransparency = 0
-    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-    hl.Adornee = character
-    hl.Parent = ScreenGui
+        local bb = Instance.new("BillboardGui")
+        bb.Name = "OmarBB"
+        bb.Size = UDim2.new(0, 200, 0, 44)
+        bb.StudsOffset = Vector3.new(0, 3, 0)
+        bb.AlwaysOnTop = true
+        bb.Adornee = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
+        bb.Parent = ScreenGui
 
-    -- Billboard for name + distance
-    local bb = Instance.new("BillboardGui")
-    bb.Name = "OmarBB"
-    bb.Size = UDim2.new(0, 200, 0, 44)
-    bb.StudsOffset = Vector3.new(0, 3, 0)
-    bb.AlwaysOnTop = true
-    bb.Adornee = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
-    bb.Parent = ScreenGui
+        local nameLbl = Instance.new("TextLabel")
+        nameLbl.Size = UDim2.new(1, 0, 0, 20)
+        nameLbl.BackgroundTransparency = 1
+        nameLbl.TextColor3 = Color3.fromRGB(230, 200, 255)
+        nameLbl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+        nameLbl.TextStrokeTransparency = 0
+        nameLbl.Font = Enum.Font.GothamBold
+        nameLbl.TextSize = 14
+        nameLbl.Text = ""
+        nameLbl.Parent = bb
 
-    local nameLbl = Instance.new("TextLabel")
-    nameLbl.Name = "Name"
-    nameLbl.Size = UDim2.new(1, 0, 0, 20)
-    nameLbl.Position = UDim2.new(0, 0, 0, 0)
-    nameLbl.BackgroundTransparency = 1
-    nameLbl.TextColor3 = Color3.fromRGB(230, 200, 255)
-    nameLbl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    nameLbl.TextStrokeTransparency = 0
-    nameLbl.Font = Enum.Font.GothamBold
-    nameLbl.TextSize = 14
-    nameLbl.Text = ""
-    nameLbl.Parent = bb
+        local distLbl = Instance.new("TextLabel")
+        distLbl.Size = UDim2.new(1, 0, 0, 16)
+        distLbl.Position = UDim2.new(0, 0, 0, 20)
+        distLbl.BackgroundTransparency = 1
+        distLbl.TextColor3 = Color3.fromRGB(200, 140, 255)
+        distLbl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+        distLbl.TextStrokeTransparency = 0
+        distLbl.Font = Enum.Font.Gotham
+        distLbl.TextSize = 12
+        distLbl.Text = ""
+        distLbl.Parent = bb
 
-    local distLbl = Instance.new("TextLabel")
-    distLbl.Name = "Distance"
-    distLbl.Size = UDim2.new(1, 0, 0, 16)
-    distLbl.Position = UDim2.new(0, 0, 0, 20)
-    distLbl.BackgroundTransparency = 1
-    distLbl.TextColor3 = Color3.fromRGB(200, 140, 255)
-    distLbl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    distLbl.TextStrokeTransparency = 0
-    distLbl.Font = Enum.Font.Gotham
-    distLbl.TextSize = 12
-    distLbl.Text = ""
-    distLbl.Parent = bb
+        local hpBB = Instance.new("BillboardGui")
+        hpBB.Size = UDim2.new(0, 40, 0, 4)
+        hpBB.StudsOffset = Vector3.new(0, 2.5, 0)
+        hpBB.AlwaysOnTop = true
+        hpBB.Adornee = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
+        hpBB.Parent = ScreenGui
 
-    -- HP bar as BillboardGui
-    local hpBB = Instance.new("BillboardGui")
-    hpBB.Name = "OmarHP"
-    hpBB.Size = UDim2.new(0, 40, 0, 4)
-    hpBB.StudsOffset = Vector3.new(0, 2.5, 0)
-    hpBB.AlwaysOnTop = true
-    hpBB.Adornee = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
-    hpBB.Parent = ScreenGui
+        local hpBg = Instance.new("Frame")
+        hpBg.Size = UDim2.new(1, 2, 1, 2)
+        hpBg.Position = UDim2.new(0, -1, 0, -1)
+        hpBg.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        hpBg.BorderSizePixel = 0
+        hpBg.Parent = hpBB
+        Instance.new("UICorner", hpBg).CornerRadius = UDim.new(0, 2)
 
-    local hpBg = Instance.new("Frame")
-    hpBg.Size = UDim2.new(1, 2, 1, 2)
-    hpBg.Position = UDim2.new(0, -1, 0, -1)
-    hpBg.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    hpBg.BorderSizePixel = 0
-    hpBg.Parent = hpBB
-    Instance.new("UICorner", hpBg).CornerRadius = UDim.new(0, 2)
+        local hpFill = Instance.new("Frame")
+        hpFill.Size = UDim2.new(1, 0, 1, 0)
+        hpFill.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+        hpFill.BorderSizePixel = 0
+        hpFill.Parent = hpBg
+        Instance.new("UICorner", hpFill).CornerRadius = UDim.new(0, 2)
 
-    local hpFill = Instance.new("Frame")
-    hpFill.Size = UDim2.new(1, 0, 1, 0)
-    hpFill.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
-    hpFill.BorderSizePixel = 0
-    hpFill.Parent = hpBg
-    Instance.new("UICorner", hpFill).CornerRadius = UDim.new(0, 2)
-
-    espObjects[character] = {
-        hl = hl, bb = bb, hpBB = hpBB,
-        nameLbl = nameLbl, distLbl = distLbl,
-        hpFill = hpFill, hpBg = hpBg,
-    }
+        espObjects[character] = {
+            hl = hl, bb = bb, hpBB = hpBB,
+            nameLbl = nameLbl, distLbl = distLbl,
+            hpFill = hpFill, hpBg = hpBg,
+        }
+    end)
+    if not ok then log("createESP error: " .. tostring(err)) end
 end
 
 local function removeNativeESP(character)
@@ -618,31 +628,34 @@ local function removeNativeESP(character)
     espObjects[character] = nil
 end
 
-track(Workspace.DescendantRemoving:Connect(function(obj)
-    if espObjects[obj] then removeNativeESP(obj) end
-end))
-track(Players.PlayerRemoving:Connect(function(p)
-    if p.Character then removeNativeESP(p.Character) end
-end))
-
-print("[OmarHub] ESP system ready")
+pcall(function()
+    safeConnect(Workspace.DescendantRemoving, function(obj)
+        if espObjects[obj] then removeNativeESP(obj) end
+    end)
+end)
+pcall(function()
+    safeConnect(Players.PlayerRemoving, function(p)
+        if p.Character then removeNativeESP(p.Character) end
+    end)
+end)
+log("ESP system ready")
 
 -- ============ MOUSE STATE ============
-track(UserInputService.InputBegan:Connect(function(input, gp)
+safeConnect(UserInputService.InputBegan, function(input, gp)
     if gp then return end
     if input.UserInputType == Enum.UserInputType.MouseButton1
     or input.UserInputType == Enum.UserInputType.MouseButton2
     or input.UserInputType == Enum.UserInputType.Touch then
         mouseHeld = true
     end
-end))
-track(UserInputService.InputEnded:Connect(function(input)
+end)
+safeConnect(UserInputService.InputEnded, function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1
     or input.UserInputType == Enum.UserInputType.MouseButton2
     or input.UserInputType == Enum.UserInputType.Touch then
         mouseHeld = false
     end
-end))
+end)
 
 -- ============ AIMBOT ============
 local function findAimbotTarget()
@@ -675,7 +688,7 @@ local function findAimbotTarget()
     return best
 end
 
-local aimStep = function()
+local function aimStep()
     if Config.Aimbot.Enabled then
         local r = Config.Aimbot.FOV
         FovRing.Size = UDim2.new(0, r * 2, 0, r * 2)
@@ -698,29 +711,30 @@ local aimStep = function()
     end
 end
 
-RunService:BindToRenderStep("OmarHubAimbot", Enum.RenderPriority.Camera.Value + 1, aimStep)
-print("[OmarHub] Aimbot bound")
+pcall(function()
+    RunService:BindToRenderStep("OmarHubAimbot", Enum.RenderPriority.Camera.Value + 1, aimStep)
+    log("Aimbot bound")
+end)
 
 -- ============ SILENT AIM ============
 local silentFiring = false
 local silentTapUntil = 0
-
 local function silentTrigger() silentTapUntil = tick() + 0.2 end
 
-track(UserInputService.InputBegan:Connect(function(input, gp)
+safeConnect(UserInputService.InputBegan, function(input, gp)
     if gp then return end
     if input.UserInputType == Enum.UserInputType.MouseButton1
     or input.UserInputType == Enum.UserInputType.Touch then
         silentFiring = true
         silentTrigger()
     end
-end))
-track(UserInputService.InputEnded:Connect(function(input)
+end)
+safeConnect(UserInputService.InputEnded, function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1
     or input.UserInputType == Enum.UserInputType.Touch then
         silentFiring = false
     end
-end))
+end)
 
 local function isFiringNow() return silentFiring or tick() < silentTapUntil end
 
@@ -791,87 +805,99 @@ pcall(function()
         end
         return originalRaycastAll(self, origin, direction, params)
     end
+    log("Silent aim installed")
 end)
-print("[OmarHub] Silent aim installed")
 
--- Silent ring UI
-track(RunService.RenderStepped:Connect(function()
-    if Config.SilentAim.Enabled then
-        local r = Config.SilentAim.FOV
-        SilentRing.Size = UDim2.new(0, r * 2, 0, r * 2)
-        SilentRing.Position = UDim2.new(0.5, 0, 0.5, 0)
-        SilentRing.Visible = true
-    else
-        SilentRing.Visible = false
-    end
-end))
-
--- ============ ESP RENDER (native) ============
-track(RunService.RenderStepped:Connect(function()
-    if not Config.ESP.Enabled then
-        for _, d in pairs(espObjects) do
-            if d.hl then d.hl.Enabled = false end
-            if d.bb then d.bb.Enabled = false end
-            if d.hpBB then d.hpBB.Enabled = false end
+-- ============ RENDER LOOPS ============
+pcall(function()
+    safeConnect(RunService.RenderStepped, function()
+        -- FOV rings
+        if Config.Aimbot.Enabled then
+            local r = Config.Aimbot.FOV
+            FovRing.Size = UDim2.new(0, r * 2, 0, r * 2)
+            FovRing.Position = UDim2.new(0.5, 0, 0.5, 0)
+            FovRing.Visible = true
+        else
+            FovRing.Visible = false
         end
-        return
-    end
 
-    local live = {}
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p == LocalPlayer then continue end
-        if isTeammate(p, Config.ESP.TeamCheck) then continue end
-        if not isAlive(p) then continue end
-        local char = p.Character
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-        local hrp = char and char:FindFirstChild("HumanoidRootPart")
-        if char and hum and hrp then
-            live[char] = true
-            if not espObjects[char] then createNativeESP(char) end
-            local d = espObjects[char]
+        if Config.SilentAim.Enabled then
+            local r = Config.SilentAim.FOV
+            SilentRing.Size = UDim2.new(0, r * 2, 0, r * 2)
+            SilentRing.Position = UDim2.new(0.5, 0, 0.5, 0)
+            SilentRing.Visible = true
+        else
+            SilentRing.Visible = false
+        end
 
-            d.hl.Enabled = Config.ESP.ShowBox
-            d.bb.Enabled = Config.ESP.ShowName or Config.ESP.ShowDistance
-            d.hpBB.Enabled = Config.ESP.ShowHealth
-
-            local name = (p.DisplayName ~= "" and p.DisplayName) or p.Name
-            d.nameLbl.Visible = Config.ESP.ShowName
-            if Config.ESP.ShowName then d.nameLbl.Text = name end
-
-            d.distLbl.Visible = Config.ESP.ShowDistance
-            if Config.ESP.ShowDistance then
-                local dist = math.floor((Camera.CFrame.Position - hrp.Position).Magnitude)
-                d.distLbl.Text = string.format("[%d studs]", dist)
+        -- ESP
+        if not Config.ESP.Enabled then
+            for _, d in pairs(espObjects) do
+                if d.hl then d.hl.Enabled = false end
+                if d.bb then d.bb.Enabled = false end
+                if d.hpBB then d.hpBB.Enabled = false end
             end
+        else
+            local live = {}
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p == LocalPlayer then continue end
+                if isTeammate(p, Config.ESP.TeamCheck) then continue end
+                if not isAlive(p) then continue end
+                local char = p.Character
+                local hum = char and char:FindFirstChildOfClass("Humanoid")
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                if char and hum and hrp then
+                    live[char] = true
+                    if not espObjects[char] then createNativeESP(char) end
+                    local d = espObjects[char]
+                    if d then
+                        d.hl.Enabled = Config.ESP.ShowBox
+                        d.bb.Enabled = Config.ESP.ShowName or Config.ESP.ShowDistance
+                        d.hpBB.Enabled = Config.ESP.ShowHealth
 
-            if Config.ESP.ShowHealth then
-                local hpPct = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
-                d.hpFill.Size = UDim2.new(hpPct, 0, 1, 0)
-                d.hpFill.BackgroundColor3 = Color3.fromRGB(
-                    math.floor(255 * (1 - hpPct)),
-                    math.floor(255 * hpPct),
-                    0
-                )
+                        local name = (p.DisplayName ~= "" and p.DisplayName) or p.Name
+                        d.nameLbl.Visible = Config.ESP.ShowName
+                        if Config.ESP.ShowName then d.nameLbl.Text = name end
+
+                        d.distLbl.Visible = Config.ESP.ShowDistance
+                        if Config.ESP.ShowDistance then
+                            local dist = math.floor((Camera.CFrame.Position - hrp.Position).Magnitude)
+                            d.distLbl.Text = string.format("[%d studs]", dist)
+                        end
+
+                        if Config.ESP.ShowHealth then
+                            local hpPct = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+                            d.hpFill.Size = UDim2.new(hpPct, 0, 1, 0)
+                            d.hpFill.BackgroundColor3 = Color3.fromRGB(
+                                math.floor(255 * (1 - hpPct)),
+                                math.floor(255 * hpPct),
+                                0
+                            )
+                        end
+                    end
+                end
+            end
+            for char, d in pairs(espObjects) do
+                if not live[char] then
+                    if d.hl then d.hl.Enabled = false end
+                    if d.bb then d.bb.Enabled = false end
+                    if d.hpBB then d.hpBB.Enabled = false end
+                end
             end
         end
-    end
-
-    for char, d in pairs(espObjects) do
-        if not live[char] then
-            if d.hl then d.hl.Enabled = false end
-            if d.bb then d.bb.Enabled = false end
-            if d.hpBB then d.hpBB.Enabled = false end
-        end
-    end
-end))
+    end)
+    log("Render loop bound")
+end)
 
 -- Restore autorotate
-track(RunService.Stepped:Connect(function()
-    if Config.Aimbot.Enabled then return end
-    local char = LocalPlayer.Character
-    local hum = char and char:FindFirstChildOfClass("Humanoid")
-    if hum and not hum.AutoRotate then hum.AutoRotate = true end
-end))
+pcall(function()
+    safeConnect(RunService.Stepped, function()
+        if Config.Aimbot.Enabled then return end
+        local char = LocalPlayer.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if hum and not hum.AutoRotate then hum.AutoRotate = true end
+    end)
+end)
 
 -- ============ TOGGLE / CLOSE ============
 local function setUIVisible(vis)
@@ -879,20 +905,20 @@ local function setUIVisible(vis)
     FloatPill.Visible = not vis
 end
 
-track(ToggleBtn.MouseButton1Click:Connect(function()
-    print("[OmarHub] Hide clicked")
+safeConnect(ToggleBtn.MouseButton1Click, function()
+    log("Hide clicked")
     setUIVisible(false)
-end))
+end)
 
-track(UserInputService.InputBegan:Connect(function(input, gp)
+safeConnect(UserInputService.InputBegan, function(input, gp)
     if gp then return end
     if input.KeyCode == Config.ToggleKey then
         setUIVisible(not Main.Visible)
     end
-end))
+end)
 
 local function shutdown()
-    print("[OmarHub] Shutting down")
+    log("Shutting down")
     pcall(function() RunService:UnbindFromRenderStep("OmarHubAimbot") end)
     if originalRaycast then
         pcall(function() Workspace.Raycast = originalRaycast end)
@@ -912,6 +938,6 @@ local function shutdown()
     pcall(function() ScreenGui:Destroy() end)
 end
 
-track(CloseBtn.MouseButton1Click:Connect(shutdown))
+safeConnect(CloseBtn.MouseButton1Click, shutdown)
 
-print("[OmarHub] Loaded successfully.")
+log("=== Loaded successfully ===")
