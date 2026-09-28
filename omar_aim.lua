@@ -1,5 +1,5 @@
 --[[
-    Omar Hub v5
+    Omar Hub
     Credit: Made by Omar
 --]]
 
