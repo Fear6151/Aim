@@ -1,604 +1,440 @@
-
---========================================================
--- OMAR ASSIST V4
--- Created by Omar
---========================================================
+--[[
+    Omar's Aimbot + ESP
+    Credit: Made by Omar.
+--]]
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
-
+local Camera = Workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
--- SETTINGS
-local AIM_ENABLED = false
-local ESP_ENABLED = false
-local TEAM_CHECK = true
-local SMOOTHNESS = 15
-local TARGET_PART = "Head"
+-- ============ CONFIG ============
+local Config = {
+    ESP = {
+        Enabled = true,
+        ShowName = true,
+        ShowDistance = true,
+        ShowHealth = true,
+        ShowBox = true,
+        TeamCheck = true,
+    },
+    Aimbot = {
+        Enabled = false,
+        FOV = 150,
+        Smoothness = 1, -- 1 = instant lock, higher = smoother
+        TargetPart = "Head", -- "Head" or "Torso"
+        TeamCheck = true,
+        MaxDistance = 1000,
+        VisibleOnly = false,
+    }
+}
 
-local currentTarget
-local highlights = {}
-local running = true
+-- ============ UI ============
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "OmarHub"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
-local PURPLE = Color3.fromRGB(165, 95, 255)
-local WHITE = Color3.fromRGB(245, 245, 250)
-local BLACK = Color3.fromRGB(16, 16, 22)
-local PANEL = Color3.fromRGB(27, 27, 36)
+local Main = Instance.new("Frame")
+Main.Size = UDim2.new(0, 260, 0, 380)
+Main.Position = UDim2.new(0.5, -130, 0.5, -190)
+Main.BackgroundColor3 = Color3.fromRGB(15, 10, 20)
+Main.BorderSizePixel = 0
+Main.Active = true
+Main.Draggable = true
+Main.Parent = ScreenGui
 
---========================================================
--- TARGET VALIDATION
---========================================================
+local UICorner = Instance.new("UICorner", Main)
+UICorner.CornerRadius = UDim.new(0, 8)
 
-local function getPlayer(model)
+local Stroke = Instance.new("UIStroke", Main)
+Stroke.Color = Color3.fromRGB(140, 60, 220)
+Stroke.Thickness = 1.5
+Stroke.Transparency = 0.2
+
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 32)
+TitleBar.BackgroundColor3 = Color3.fromRGB(30, 15, 45)
+TitleBar.BorderSizePixel = 0
+TitleBar.Parent = Main
+Instance.new("UICorner", TitleBar).CornerRadius = UDim.new(0, 8)
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -40, 1, 0)
+Title.Position = UDim2.new(0, 10, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "Omar Hub"
+Title.TextColor3 = Color3.fromRGB(200, 130, 255)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 15
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = TitleBar
+
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 24, 0, 24)
+CloseBtn.Position = UDim2.new(1, -28, 0, 4)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(60, 20, 60)
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 150, 255)
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.TextSize = 13
+CloseBtn.BorderSizePixel = 0
+CloseBtn.Parent = TitleBar
+Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
+
+local Content = Instance.new("Frame")
+Content.Size = UDim2.new(1, -16, 1, -44)
+Content.Position = UDim2.new(0, 8, 0, 38)
+Content.BackgroundTransparency = 1
+Content.Parent = Main
+
+local function makeToggle(text, yPos, default, callback)
+    local Btn = Instance.new("TextButton")
+    Btn.Size = UDim2.new(1, 0, 0, 30)
+    Btn.Position = UDim2.new(0, 0, 0, yPos)
+    Btn.BackgroundColor3 = default and Color3.fromRGB(90, 40, 140) or Color3.fromRGB(35, 20, 50)
+    Btn.Text = ""
+    Btn.BorderSizePixel = 0
+    Btn.Parent = Content
+    Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 6)
+
+    local Lbl = Instance.new("TextLabel")
+    Lbl.Size = UDim2.new(1, -10, 1, 0)
+    Lbl.Position = UDim2.new(0, 10, 0, 0)
+    Lbl.BackgroundTransparency = 1
+    Lbl.Text = text
+    Lbl.TextColor3 = Color3.fromRGB(230, 200, 255)
+    Lbl.Font = Enum.Font.Gotham
+    Lbl.TextSize = 13
+    Lbl.TextXAlignment = Enum.TextXAlignment.Left
+    Lbl.Parent = Btn
+
+    local state = default
+    Btn.MouseButton1Click:Connect(function()
+        state = not state
+        Btn.BackgroundColor3 = state and Color3.fromRGB(90, 40, 140) or Color3.fromRGB(35, 20, 50)
+        callback(state)
+    end)
+    return Btn
+end
+
+local function makeSlider(text, yPos, min, max, default, callback)
+    local Frame = Instance.new("Frame")
+    Frame.Size = UDim2.new(1, 0, 0, 42)
+    Frame.Position = UDim2.new(0, 0, 0, yPos)
+    Frame.BackgroundTransparency = 1
+    Frame.Parent = Content
+
+    local Lbl = Instance.new("TextLabel")
+    Lbl.Size = UDim2.new(1, 0, 0, 18)
+    Lbl.BackgroundTransparency = 1
+    Lbl.Text = text .. ": " .. default
+    Lbl.TextColor3 = Color3.fromRGB(230, 200, 255)
+    Lbl.Font = Enum.Font.Gotham
+    Lbl.TextSize = 12
+    Lbl.TextXAlignment = Enum.TextXAlignment.Left
+    Lbl.Parent = Frame
+
+    local Bar = Instance.new("Frame")
+    Bar.Size = UDim2.new(1, 0, 0, 14)
+    Bar.Position = UDim2.new(0, 0, 0, 22)
+    Bar.BackgroundColor3 = Color3.fromRGB(35, 20, 50)
+    Bar.BorderSizePixel = 0
+    Bar.Parent = Frame
+    Instance.new("UICorner", Bar).CornerRadius = UDim.new(0, 6)
+
+    local Fill = Instance.new("Frame")
+    Fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
+    Fill.BackgroundColor3 = Color3.fromRGB(150, 70, 220)
+    Fill.BorderSizePixel = 0
+    Fill.Parent = Bar
+    Instance.new("UICorner", Fill).CornerRadius = UDim.new(0, 6)
+
+    local dragging = false
+    Bar.InputBegan:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(i)
+        if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
+            local rel = math.clamp((i.Position.X - Bar.AbsolutePosition.X) / Bar.AbsoluteSize.X, 0, 1)
+            Fill.Size = UDim2.new(rel, 0, 1, 0)
+            local val = math.floor(min + (max - min) * rel)
+            Lbl.Text = text .. ": " .. val
+            callback(val)
+        end
+    end)
+end
+
+-- ESP Toggles
+makeToggle("ESP Enabled", 0, Config.ESP.Enabled, function(v) Config.ESP.Enabled = v end)
+makeToggle("Show Name", 34, Config.ESP.ShowName, function(v) Config.ESP.ShowName = v end)
+makeToggle("Show Distance", 68, Config.ESP.ShowDistance, function(v) Config.ESP.ShowDistance = v end)
+makeToggle("Show Health", 102, Config.ESP.ShowHealth, function(v) Config.ESP.ShowHealth = v end)
+makeToggle("Show Box", 136, Config.ESP.ShowBox, function(v) Config.ESP.ShowBox = v end)
+makeToggle("ESP Team Check", 170, Config.ESP.TeamCheck, function(v) Config.ESP.TeamCheck = v end)
+
+-- Aimbot Toggles
+makeToggle("Aimbot Enabled", 210, Config.Aimbot.Enabled, function(v) Config.Aimbot.Enabled = v end)
+makeToggle("Target: Head", 244, true, function(v)
+    Config.Aimbot.TargetPart = v and "Head" or "Torso"
+end)
+makeToggle("Aimbot Team Check", 278, Config.Aimbot.TeamCheck, function(v) Config.Aimbot.TeamCheck = v end)
+
+makeSlider("FOV", 312, 30, 500, Config.Aimbot.FOV, function(v) Config.Aimbot.FOV = v end)
+
+-- Credit
+local Credit = Instance.new("TextLabel")
+Credit.Size = UDim2.new(1, 0, 0, 20)
+Credit.Position = UDim2.new(0, 0, 1, -22)
+Credit.BackgroundTransparency = 1
+Credit.Text = "Made by Omar"
+Credit.TextColor3 = Color3.fromRGB(180, 100, 240)
+Credit.Font = Enum.Font.GothamBold
+Credit.TextSize = 12
+Credit.Parent = Main
+
+CloseBtn.MouseButton1Click:Connect(function()
+    ScreenGui.Enabled = not ScreenGui.Enabled
+end)
+
+-- ============ FOV CIRCLE ============
+local FovCircle = Instance.new("Frame")
+FovCircle.AnchorPoint = Vector2.new(0.5, 0.5)
+FovCircle.BackgroundTransparency = 1
+FovCircle.BorderSizePixel = 0
+FovCircle.Parent = ScreenGui
+
+local FovCorner = Instance.new("UICorner", FovCircle)
+FovCorner.CornerRadius = UDim.new(1, 0)
+
+local FovStroke = Instance.new("UIStroke", FovCircle)
+FovStroke.Color = Color3.fromRGB(180, 100, 255)
+FovStroke.Thickness = 1.5
+FovStroke.Transparency = 0.3
+
+-- ============ ESP DRAWINGS ============
+local espObjects = {}
+
+local function createESP(player)
+    if espObjects[player] then return end
+    local drawings = {
+        Box = Drawing.new("Square"),
+        Name = Drawing.new("Text"),
+        Distance = Drawing.new("Text"),
+        HealthBar = Drawing.new("Square"),
+        HealthBarBg = Drawing.new("Square"),
+    }
+    drawings.Box.Thickness = 1
+    drawings.Box.Color = Color3.fromRGB(160, 80, 255)
+    drawings.Box.Filled = false
+    drawings.Box.Transparency = 1
+    drawings.Box.Visible = false
+
+    drawings.HealthBarBg.Filled = true
+    drawings.HealthBarBg.Color = Color3.fromRGB(0, 0, 0)
+    drawings.HealthBarBg.Transparency = 0.6
+    drawings.HealthBarBg.Visible = false
+
+    drawings.HealthBar.Filled = true
+    drawings.HealthBar.Color = Color3.fromRGB(0, 255, 0)
+    drawings.HealthBar.Transparency = 1
+    drawings.HealthBar.Visible = false
+
+    for _, d in pairs({drawings.Name, drawings.Distance}) do
+        d.Size = 14
+        d.Center = true
+        d.Outline = true
+        d.OutlineColor = Color3.fromRGB(0, 0, 0)
+        d.Color = Color3.fromRGB(255, 255, 255)
+        d.Font = 2
+        d.Visible = false
+    end
+    drawings.Name.Color = Color3.fromRGB(220, 180, 255)
+    drawings.Distance.Color = Color3.fromRGB(200, 140, 255)
+
+    espObjects[player] = drawings
+end
+
+local function removeESP(player)
+    local d = espObjects[player]
+    if not d then return end
+    for _, obj in pairs(d) do
+        pcall(function() obj:Remove() end)
+    end
+    espObjects[player] = nil
+end
+
+for _, p in ipairs(Players:GetPlayers()) do
+    if p ~= LocalPlayer then createESP(p) end
+end
+Players.PlayerAdded:Connect(function(p)
+    if p ~= LocalPlayer then createESP(p) end
+end)
+Players.PlayerRemoving:Connect(removeESP)
+
+local function isTeammate(player)
+    if not Config.ESP.TeamCheck and not Config.Aimbot.TeamCheck then return false end
+    return player.Team == LocalPlayer.Team and player.Team ~= nil
+end
+
+local function isAlive(plr)
+    local char = plr.Character
+    if not char then return false end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    return hum and hum.Health > 0
+end
+
+-- ============ RENDER ESP ============
+RunService.RenderStepped:Connect(function()
+    -- Update FOV circle
+    if Config.Aimbot.Enabled then
+        FovCircle.Visible = true
+        FovCircle.Size = UDim2.new(0, Config.Aimbot.FOV * 2, 0, Config.Aimbot.FOV * 2)
+        FovCircle.Position = UDim2.new(0.5, 0, 0.5, 0)
+    else
+        FovCircle.Visible = false
+    end
+
+    for player, drawings in pairs(espObjects) do
+        local char = player.Character
+        local visible = Config.ESP.Enabled
+            and char
+            and isAlive(player)
+            and not (Config.ESP.TeamCheck and isTeammate(player))
+            and player ~= LocalPlayer
+
+        if not visible then
+            for _, d in pairs(drawings) do d.Visible = false end
+            continue
+        end
+
+        local hrp = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Head")
+        local head = char:FindFirstChild("Head")
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if not (hrp and head and hum) then
+            for _, d in pairs(drawings) do d.Visible = false end
+            continue
+        end
+
+        local headPos, onScreen = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
+        local rootPos = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3, 0))
+
+        if not onScreen or headPos.Z < 0 then
+            for _, d in pairs(drawings) do d.Visible = false end
+            continue
+        end
+
+        local height = math.abs(rootPos.Y - headPos.Y)
+        local width = height * 0.6
+        local topLeft = Vector2.new(headPos.X - width / 2, headPos.Y)
+        local bottomRight = Vector2.new(headPos.X + width / 2, rootPos.Y)
+
+        -- Box
+        if Config.ESP.ShowBox then
+            drawings.Box.Visible = true
+            drawings.Box.Size = bottomRight - topLeft
+            drawings.Box.Position = topLeft
+        else
+            drawings.Box.Visible = false
+        end
+
+        -- Name
+        if Config.ESP.ShowName then
+            drawings.Name.Visible = true
+            drawings.Name.Text = player.Name
+            drawings.Name.Position = Vector2.new(headPos.X, topLeft.Y - 16)
+        else
+            drawings.Name.Visible = false
+        end
+
+        -- Distance
+        if Config.ESP.ShowDistance then
+            drawings.Distance.Visible = true
+            local dist = (Camera.CFrame.Position - hrp.Position).Magnitude
+            drawings.Distance.Text = string.format("[%d studs]", math.floor(dist))
+            drawings.Distance.Position = Vector2.new(headPos.X, bottomRight.Y + 2)
+        else
+            drawings.Distance.Visible = false
+        end
+
+        -- Health bar
+        if Config.ESP.ShowHealth then
+            local hpPct = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+            local barH = bottomRight.Y - topLeft.Y
+            local barX = bottomRight.X + 4
+
+            drawings.HealthBarBg.Visible = true
+            drawings.HealthBarBg.Size = Vector2.new(3, barH)
+            drawings.HealthBarBg.Position = Vector2.new(barX, topLeft.Y)
+
+            drawings.HealthBar.Visible = true
+            drawings.HealthBar.Size = Vector2.new(3, barH * hpPct)
+            drawings.HealthBar.Position = Vector2.new(barX, topLeft.Y + barH * (1 - hpPct))
+            drawings.HealthBar.Color = Color3.fromRGB(255 * (1 - hpPct), 255 * hpPct, 0)
+        else
+            drawings.HealthBar.Visible = false
+            drawings.HealthBarBg.Visible = false
+        end
+    end
+end)
+
+-- ============ AIMBOT ============
+local function getClosestTarget()
+    local closest, closestDist = nil, math.huge
+    local mousePos = UserInputService:GetMouseLocation()
+    local viewportCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    local origin = Camera.CFrame.Position
+
     for _, player in ipairs(Players:GetPlayers()) do
-        if player.Character == model then
-            return player
+        if player == LocalPlayer then continue end
+        if Config.Aimbot.TeamCheck and isTeammate(player) then continue end
+        if not isAlive(player) then continue end
+
+        local char = player.Character
+        local part = char:FindFirstChild(Config.Aimbot.TargetPart)
+            or char:FindFirstChild("HumanoidRootPart")
+        if not part then continue end
+
+        local distFromMe = (origin - part.Position).Magnitude
+        if distFromMe > Config.Aimbot.MaxDistance then continue end
+
+        local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
+        if not onScreen or screenPos.Z < 0 then continue end
+
+        local screenVec = Vector2.new(screenPos.X, screenPos.Y)
+        local distFromCenter = (screenVec - viewportCenter).Magnitude
+
+        if distFromCenter <= Config.Aimbot.FOV and distFromCenter < closestDist then
+            closestDist = distFromCenter
+            closest = part
         end
     end
+    return closest
 end
 
-local function getPart(model)
-    if not model then return nil end
+RunService.RenderStepped:Connect(function(dt)
+    if not Config.Aimbot.Enabled then return end
+    if UserInputService:IsKeyDown(Enum.KeyCode.E) then return end -- optional hold key
 
-    if TARGET_PART == "Head" then
-        return model:FindFirstChild("Head")
-    end
+    local target = getClosestTarget()
+    if not target then return end
 
-    return model:FindFirstChild("UpperTorso")
-        or model:FindFirstChild("Torso")
-        or model:FindFirstChild("HumanoidRootPart")
-end
+    local targetPos = target.Position
+    local currentCF = Camera.CFrame
+    local desiredCF = CFrame.new(currentCF.Position, targetPos)
 
-local function validTarget(model)
-    if not model or not model:IsA("Model") then
-        return false
-    end
-
-    local humanoid = model:FindFirstChildOfClass("Humanoid")
-
-    if not humanoid or humanoid.Health <= 0 then
-        return false
-    end
-
-    if not getPart(model) then
-        return false
-    end
-
-    local player = getPlayer(model)
-
-    if player then
-        if player == LocalPlayer then
-            return false
-        end
-
-        if TEAM_CHECK
-            and LocalPlayer.Team ~= nil
-            and player.Team == LocalPlayer.Team then
-            return false
-        end
-    end
-
-    return true
-end
-
---========================================================
--- FIND TARGETS
---========================================================
-
-local function getCandidates()
-    local result = {}
-    local seen = {}
-
-    for _, player in ipairs(Players:GetPlayers()) do
-        local character = player.Character
-
-        if character and validTarget(character) then
-            table.insert(result, character)
-            seen[character] = true
-        end
-    end
-
-    -- NPCs and bots
-    for _, object in ipairs(Workspace:GetDescendants()) do
-        if object:IsA("Model")
-            and not seen[object]
-            and not getPlayer(object)
-            and validTarget(object) then
-
-            table.insert(result, object)
-            seen[object] = true
-        end
-    end
-
-    return result
-end
-
---========================================================
--- AIMLOCK
---========================================================
-
-local function findTarget()
-    local camera = Workspace.CurrentCamera
-    if not camera then return nil end
-
-    local center = camera.ViewportSize / 2
-    local nearest
-    local nearestDistance = math.huge
-
-    for _, model in ipairs(getCandidates()) do
-        local part = getPart(model)
-
-        if part then
-            local screenPosition =
-                camera:WorldToViewportPoint(part.Position)
-
-            -- No FOV radius restriction.
-            -- Select the closest target to screen center.
-            if screenPosition.Z > 0 then
-                local point = Vector2.new(
-                    screenPosition.X,
-                    screenPosition.Y
-                )
-
-                local distance = (point - center).Magnitude
-
-                if distance < nearestDistance then
-                    nearestDistance = distance
-                    nearest = model
-                end
-            end
-        end
-    end
-
-    return nearest
-end
-
-local function aimAtTarget()
-    if not AIM_ENABLED then
-        currentTarget = nil
-        return
-    end
-
-    local camera = Workspace.CurrentCamera
-    if not camera then return end
-
-    -- Sticky target: do not switch while valid.
-    if not validTarget(currentTarget) then
-        currentTarget = findTarget()
-    end
-
-    if not currentTarget then return end
-
-    local part = getPart(currentTarget)
-
-    if not part then
-        currentTarget = nil
-        return
-    end
-
-    local origin = camera.CFrame.Position
-    local destination = part.Position
-
-    local desired = CFrame.lookAt(origin, destination)
-
-    -- Smoothness 1 = instant.
-    -- Smoothness 100 = gradual.
-    local alpha = 1 - math.exp(-20 / SMOOTHNESS)
-
-    camera.CFrame = camera.CFrame:Lerp(desired, alpha)
-end
-
---========================================================
--- ESP
---========================================================
-
-local function removeESP(model)
-    local highlight = highlights[model]
-
-    if highlight then
-        highlight:Destroy()
-        highlights[model] = nil
-    end
-end
-
-local function updateESP()
-    local active = {}
-
-    if ESP_ENABLED then
-        for _, model in ipairs(getCandidates()) do
-            if validTarget(model) then
-                active[model] = true
-
-                local highlight = highlights[model]
-
-                if not highlight or highlight.Parent ~= model then
-                    removeESP(model)
-
-                    highlight = Instance.new("Highlight")
-                    highlight.Name = "OmarESP"
-                    highlight.Adornee = model
-                    highlight.FillColor = PURPLE
-                    highlight.OutlineColor = WHITE
-                    highlight.FillTransparency = 0.75
-                    highlight.OutlineTransparency = 0
-
-                    -- Visible through walls.
-                    highlight.DepthMode =
-                        Enum.HighlightDepthMode.AlwaysOnTop
-
-                    highlight.Parent = model
-                    highlights[model] = highlight
-                end
-            end
-        end
-    end
-
-    for model in pairs(highlights) do
-        if not active[model] then
-            removeESP(model)
-        end
-    end
-end
-
---========================================================
--- GUI
---========================================================
-
-local gui = Instance.new("ScreenGui")
-gui.Name = "OmarAssistV4"
-gui.ResetOnSpawn = false
-gui.DisplayOrder = 100
-gui.Parent = PlayerGui
-
-local main = Instance.new("Frame")
-main.Size = UDim2.fromOffset(285, 350)
-main.Position = UDim2.new(0.5, -142, 0.5, -175)
-main.BackgroundColor3 = BLACK
-main.BorderSizePixel = 0
-main.Parent = gui
-
-Instance.new("UICorner", main).CornerRadius = UDim.new(0, 12)
-
-local outline = Instance.new("UIStroke")
-outline.Color = PURPLE
-outline.Thickness = 1.5
-outline.Parent = main
-
-local function label(text, position, size, parent)
-    local object = Instance.new("TextLabel")
-    object.Size = size
-    object.Position = position
-    object.BackgroundTransparency = 1
-    object.Text = text
-    object.TextColor3 = WHITE
-    object.Font = Enum.Font.GothamBold
-    object.TextSize = 15
-    object.Parent = parent
-    return object
-end
-
-local header = Instance.new("Frame")
-header.Size = UDim2.new(1, 0, 0, 55)
-header.BackgroundColor3 = PANEL
-header.BorderSizePixel = 0
-header.Parent = main
-
-Instance.new("UICorner", header).CornerRadius = UDim.new(0, 12)
-
-label(
-    "OMAR ASSIST",
-    UDim2.fromOffset(14, 5),
-    UDim2.new(1, -70, 0, 28),
-    header
-)
-
-local subtitle = label(
-    "AIM  /  ESP  /  SETTINGS",
-    UDim2.fromOffset(15, 31),
-    UDim2.new(1, -70, 0, 15),
-    header
-)
-subtitle.TextColor3 = PURPLE
-subtitle.TextSize = 10
-
--- Dragging
-local dragging = false
-local dragStart
-local startPosition
-
-header.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1
-        or input.UserInputType == Enum.UserInputType.Touch then
-
-        dragging = true
-        dragStart = input.Position
-        startPosition = main.Position
+    if Config.Aimbot.Smoothness <= 1 then
+        Camera.CFrame = desiredCF
+    else
+        Camera.CFrame = currentCF:Lerp(desiredCF, 1 / Config.Aimbot.Smoothness)
     end
 end)
-
-UserInputService.InputChanged:Connect(function(input)
-    if dragging and (
-        input.UserInputType == Enum.UserInputType.MouseMovement
-        or input.UserInputType == Enum.UserInputType.Touch
-    ) then
-        local delta = input.Position - dragStart
-
-        main.Position = UDim2.new(
-            startPosition.X.Scale,
-            startPosition.X.Offset + delta.X,
-            startPosition.Y.Scale,
-            startPosition.Y.Offset + delta.Y
-        )
-    end
-end)
-
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1
-        or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = false
-    end
-end)
-
--- Button builder
-local function makeButton(text, y)
-    local button = Instance.new("TextButton")
-    button.Size = UDim2.new(1, -28, 0, 39)
-    button.Position = UDim2.fromOffset(14, y)
-    button.BackgroundColor3 = PANEL
-    button.BorderSizePixel = 0
-    button.Text = text
-    button.TextColor3 = WHITE
-    button.Font = Enum.Font.GothamMedium
-    button.TextSize = 13
-    button.AutoButtonColor = false
-    button.Parent = main
-
-    Instance.new("UICorner", button).CornerRadius = UDim.new(0, 8)
-
-    local stroke = Instance.new("UIStroke")
-    stroke.Color = WHITE
-    stroke.Thickness = 1
-    stroke.Parent = button
-
-    return button
-end
-
-local function setButton(button, text, enabled)
-    button.Text = text
-    button.BackgroundColor3 = enabled
-        and Color3.fromRGB(65, 40, 95)
-        or PANEL
-end
-
--- Aim
-local aimButton = makeButton("AIMLOCK  [ OFF ]", 70)
-
-aimButton.Activated:Connect(function()
-    AIM_ENABLED = not AIM_ENABLED
-
-    if not AIM_ENABLED then
-        currentTarget = nil
-    end
-
-    setButton(
-        aimButton,
-        AIM_ENABLED and "AIMLOCK  [ ON ]" or "AIMLOCK  [ OFF ]",
-        AIM_ENABLED
-    )
-end)
-
--- ESP
-local espButton = makeButton("ESP  [ OFF ]", 117)
-
-espButton.Activated:Connect(function()
-    ESP_ENABLED = not ESP_ENABLED
-
-    setButton(
-        espButton,
-        ESP_ENABLED and "ESP  [ ON ]" or "ESP  [ OFF ]",
-        ESP_ENABLED
-    )
-
-    if not ESP_ENABLED then
-        updateESP()
-    end
-end)
-
--- Team check
-local teamButton = makeButton("TEAM CHECK  [ ON ]", 164)
-
-teamButton.Activated:Connect(function()
-    TEAM_CHECK = not TEAM_CHECK
-    currentTarget = nil
-
-    setButton(
-        teamButton,
-        TEAM_CHECK and "TEAM CHECK  [ ON ]" or "TEAM CHECK  [ OFF ]",
-        TEAM_CHECK
-    )
-end)
-
--- Target part
-local partButton = makeButton("TARGET: HEAD", 211)
-
-partButton.Activated:Connect(function()
-    TARGET_PART = TARGET_PART == "Head" and "Torso" or "Head"
-    currentTarget = nil
-
-    partButton.Text = "TARGET: " .. TARGET_PART:upper()
-end)
-
--- Smoothness
-local smoothLabel = label(
-    "SMOOTHNESS: 15 / 100",
-    UDim2.fromOffset(14, 265),
-    UDim2.new(1, -28, 0, 22),
-    main
-)
-smoothLabel.TextXAlignment = Enum.TextXAlignment.Left
-smoothLabel.TextSize = 13
-
-local slider = Instance.new("TextButton")
-slider.Size = UDim2.new(1, -30, 0, 12)
-slider.Position = UDim2.fromOffset(15, 300)
-slider.BackgroundColor3 = Color3.fromRGB(65, 65, 75)
-slider.Text = ""
-slider.Parent = main
-
-Instance.new("UICorner", slider).CornerRadius = UDim.new(1, 0)
-
-local fill = Instance.new("Frame")
-fill.Size = UDim2.new(0.1414, 0, 1, 0)
-fill.BackgroundColor3 = PURPLE
-fill.BorderSizePixel = 0
-fill.Parent = slider
-
-Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
-
-local sliderDragging = false
-
-local function setSmoothness(input)
-    local width = slider.AbsoluteSize.X
-    if width <= 0 then return end
-
-    local x = input.Position.X - slider.AbsolutePosition.X
-    local alpha = math.clamp(x / width, 0, 1)
-
-    SMOOTHNESS = math.clamp(
-        math.floor(1 + alpha * 99 + 0.5),
-        1,
-        100
-    )
-
-    fill.Size = UDim2.new(alpha, 0, 1, 0)
-    smoothLabel.Text = "SMOOTHNESS: " .. SMOOTHNESS .. " / 100"
-end
-
-slider.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1
-        or input.UserInputType == Enum.UserInputType.Touch then
-
-        sliderDragging = true
-        setSmoothness(input)
-    end
-end)
-
-UserInputService.InputChanged:Connect(function(input)
-    if sliderDragging then
-        if input.UserInputType == Enum.UserInputType.MouseMovement
-            or input.UserInputType == Enum.UserInputType.Touch then
-            setSmoothness(input)
-        end
-    end
-end)
-
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1
-        or input.UserInputType == Enum.UserInputType.Touch then
-        sliderDragging = false
-    end
-end)
-
-label(
-    "CREATED BY OMAR",
-    UDim2.new(0, 0, 1, -25),
-    UDim2.new(1, 0, 0, 18),
-    main
-).TextColor3 = GRAY
-
--- Hide / reopen
-local hideButton = Instance.new("TextButton")
-hideButton.Size = UDim2.fromOffset(30, 30)
-hideButton.Position = UDim2.new(1, -38, 0, 12)
-hideButton.BackgroundColor3 = PANEL
-hideButton.Text = "—"
-hideButton.TextColor3 = WHITE
-hideButton.TextSize = 18
-hideButton.Parent = header
-
-local reopen = Instance.new("TextButton")
-reopen.Size = UDim2.fromOffset(110, 38)
-reopen.Position = UDim2.new(0, 15, 0.5, -19)
-reopen.BackgroundColor3 = BLACK
-reopen.Text = "OMAR  +"
-reopen.TextColor3 = WHITE
-reopen.Font = Enum.Font.GothamBold
-reopen.Visible = false
-reopen.Parent = gui
-
-Instance.new("UICorner", reopen).CornerRadius = UDim.new(0, 8)
-
-local reopenStroke = Instance.new("UIStroke")
-reopenStroke.Color = PURPLE
-reopenStroke.Parent = reopen
-
-hideButton.Activated:Connect(function()
-    main.Visible = false
-    reopen.Visible = true
-end)
-
-reopen.Activated:Connect(function()
-    main.Visible = true
-    reopen.Visible = false
-end)
-
---========================================================
--- MAIN LOOP
---========================================================
-
-local scanClock = 0
-local espClock = 0
-
-local scanInterval = 0.4
-local espInterval = 0.15
-
-local function update()
-    if not running then return end
-
-    scanClock += 0.4
-    espClock += 0.15
-
-    if scanClock >= scanInterval then
-        scanClock = 0
-    end
-
-    if espClock >= espInterval then
-        espClock = 0
-        updateESP()
-    end
-end
-
--- Keep camera aim after Roblox's normal camera update.
-RunService:BindToRenderStep(
-    "OmarAssistAim",
-    Enum.RenderPriority.Camera.Value + 1,
-    function()
-        if running and AIM_ENABLED then
-            aimAtTarget()
-        end
-    end
-)
-
-RunService.Heartbeat:Connect(function()
-    if not running then return end
-
-    update()
-end)
-
--- Cleanup if the GUI is removed.
-gui.Destroying:Connect(function()
-    running = false
-    RunService:UnbindFromRenderStep("OmarAssistAim")
-
-    for model, highlight in pairs(highlights) do
-        if highlight then
-            highlight:Destroy()
-        end
-        highlights[model] = nil
-    end
-end)
-
-print("Omar Assist V4 loaded successfully")
