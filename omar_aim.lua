@@ -1,6 +1,7 @@
 --[[
     Omar Hub
     Credit: Made by Omar
+
 --]]
 
 local Players          = game:GetService("Players")
@@ -9,43 +10,24 @@ local UserInputService = game:GetService("UserInputService")
 local Workspace        = game:GetService("Workspace")
 local Camera           = Workspace.CurrentCamera
 local LocalPlayer      = Players.LocalPlayer
-local Mouse            = LocalPlayer:GetMouse()
 
 -- ============ CONFIG ============
 local Config = {
     ESP = {
-        Enabled      = true,
-        ShowName     = true,
-        ShowDistance = true,
-        ShowHealth   = true,
-        ShowBox      = true,
-        TeamCheck    = true,
-        MaxBoxPixels = 1200,
+        Enabled = true, ShowName = true, ShowDistance = true,
+        ShowHealth = true, ShowBox = true, TeamCheck = true, MaxBoxPixels = 1200,
     },
     Aimbot = {
-        Enabled    = false,
-        FOV        = 150,
-        TargetPart = "Head",
-        TeamCheck  = true,
-        MaxDist    = 1000,
-        Smoothness = 100,
-        LockMode   = "Hold Mouse",
-        WallCheck  = true,
+        Enabled = false, FOV = 150, TargetPart = "Head", TeamCheck = true,
+        MaxDist = 1000, Smoothness = 100, LockMode = "Hold Mouse", WallCheck = true,
     },
     SilentAim = {
-        Enabled    = false,
-        FOV        = 220,       -- own FOV
-        TargetPart = "Head",    -- own part choice
-        TeamCheck  = true,
-        WallCheck  = true,
-        MaxDist    = 1500,
-        HitChance  = 100,       -- 0-100%
-        Sharpness  = 100,       -- 1 soft, 100 = instant snap on redirect
+        Enabled = false, FOV = 220, TargetPart = "Head", TeamCheck = true,
+        MaxDist = 1500, HitChance = 100,
     },
     ToggleKey = Enum.KeyCode.RightShift,
 }
 
--- ============ STATE ============
 local connections = {}
 local function track(c) table.insert(connections, c); return c end
 local uiInputCooldown = 0
@@ -128,7 +110,7 @@ CloseBtn.BorderSizePixel = 0
 CloseBtn.Parent = BtnRow
 Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
 
--- ============ FLOATING QUICK-PILLS ============
+-- Pills
 local function makeDraggable(button, onTap)
     local dragging, moved, dragStart, startPos = false, false, nil, nil
     local function clamp(pos)
@@ -172,7 +154,6 @@ local function makeDraggable(button, onTap)
 end
 
 local FloatPill = Instance.new("TextButton")
-FloatPill.Name = "OmarPill"
 FloatPill.Size = UDim2.new(0, 72, 0, 28)
 FloatPill.Position = UDim2.new(0, 14, 0, 90)
 FloatPill.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
@@ -190,7 +171,6 @@ Instance.new("UICorner", FloatPill).CornerRadius = UDim.new(0, 6)
 local PillStroke = Instance.new("UIStroke", FloatPill)
 PillStroke.Color = Color3.fromRGB(150, 70, 220)
 PillStroke.Thickness = 1.5
-PillStroke.Transparency = 0.15
 
 makeDraggable(FloatPill, function()
     Main.Visible = true
@@ -199,7 +179,6 @@ makeDraggable(FloatPill, function()
 end)
 
 local AimPill = Instance.new("TextButton")
-AimPill.Name = "AimPill"
 AimPill.Size = UDim2.new(0, 72, 0, 28)
 AimPill.Position = UDim2.new(0, 14, 0, 124)
 AimPill.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
@@ -217,7 +196,6 @@ Instance.new("UICorner", AimPill).CornerRadius = UDim.new(0, 6)
 local AimStroke = Instance.new("UIStroke", AimPill)
 AimStroke.Color = Color3.fromRGB(200, 60, 100)
 AimStroke.Thickness = 1.5
-AimStroke.Transparency = 0.15
 
 local function refreshAimPill()
     if Config.Aimbot.Enabled then
@@ -237,7 +215,7 @@ makeDraggable(AimPill, function()
     refreshAimPill()
 end)
 
--- Drag main panel
+-- Drag main
 do
     local dragging, dragStart, startPos = false, nil, nil
     track(TitleBar.InputBegan:Connect(function(input)
@@ -266,7 +244,7 @@ do
     end))
 end
 
--- Tabs (AIMBOT first)
+-- Tabs
 local TabsBar = Instance.new("Frame")
 TabsBar.Size = UDim2.new(1, -20, 0, 30)
 TabsBar.Position = UDim2.new(0, 10, 0, 40)
@@ -289,9 +267,9 @@ local function makeTab(name, order, total)
     Instance.new("UICorner", tab).CornerRadius = UDim.new(0, 5)
     return tab
 end
-local AimTabBtn     = makeTab("Aimbot",     1, 3)
-local SilentTabBtn  = makeTab("Silent",     2, 3)
-local EspTabBtn     = makeTab("ESP",        3, 3)
+local AimTabBtn    = makeTab("Aimbot", 1, 3)
+local SilentTabBtn = makeTab("Silent", 2, 3)
+local EspTabBtn    = makeTab("ESP",    3, 3)
 
 local Body = Instance.new("Frame")
 Body.Size = UDim2.new(1, -20, 1, -116)
@@ -349,9 +327,7 @@ local function makeToggle(parent, text, yPos, default, callback)
     Btn.Size = UDim2.new(1, -6, 0, 32)
     Btn.Position = UDim2.new(0, 3, 0, yPos)
     Btn.BackgroundColor3 = Color3.fromRGB(35, 20, 50)
-    Btn.Text = ""
-    Btn.BorderSizePixel = 0
-    Btn.AutoButtonColor = false
+    Btn.Text = ""; Btn.BorderSizePixel = 0; Btn.AutoButtonColor = false
     Btn.Parent = parent
     Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 6)
 
@@ -361,8 +337,7 @@ local function makeToggle(parent, text, yPos, default, callback)
     Lbl.BackgroundTransparency = 1
     Lbl.Text = text
     Lbl.TextColor3 = Color3.fromRGB(230, 200, 255)
-    Lbl.Font = Enum.Font.Gotham
-    Lbl.TextSize = 13
+    Lbl.Font = Enum.Font.Gotham; Lbl.TextSize = 13
     Lbl.TextXAlignment = Enum.TextXAlignment.Left
     Lbl.Parent = Btn
 
@@ -370,16 +345,14 @@ local function makeToggle(parent, text, yPos, default, callback)
     Pill.Size = UDim2.new(0, 40, 0, 20)
     Pill.Position = UDim2.new(1, -50, 0.5, -10)
     Pill.BackgroundColor3 = default and Color3.fromRGB(150, 70, 220) or Color3.fromRGB(60, 40, 80)
-    Pill.BorderSizePixel = 0
-    Pill.Parent = Btn
+    Pill.BorderSizePixel = 0; Pill.Parent = Btn
     Instance.new("UICorner", Pill).CornerRadius = UDim.new(1, 0)
 
     local Knob = Instance.new("Frame")
     Knob.Size = UDim2.new(0, 16, 0, 16)
     Knob.Position = default and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
     Knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    Knob.BorderSizePixel = 0
-    Knob.Parent = Pill
+    Knob.BorderSizePixel = 0; Knob.Parent = Pill
     Instance.new("UICorner", Knob).CornerRadius = UDim.new(1, 0)
 
     local state = default
@@ -397,8 +370,7 @@ local function makeSwitch(parent, text, yPos, options, default, callback)
     Frame.Size = UDim2.new(1, -6, 0, 32)
     Frame.Position = UDim2.new(0, 3, 0, yPos)
     Frame.BackgroundColor3 = Color3.fromRGB(35, 20, 50)
-    Frame.BorderSizePixel = 0
-    Frame.Parent = parent
+    Frame.BorderSizePixel = 0; Frame.Parent = parent
     Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 6)
 
     local Lbl = Instance.new("TextLabel")
@@ -407,8 +379,7 @@ local function makeSwitch(parent, text, yPos, options, default, callback)
     Lbl.BackgroundTransparency = 1
     Lbl.Text = text
     Lbl.TextColor3 = Color3.fromRGB(230, 200, 255)
-    Lbl.Font = Enum.Font.Gotham
-    Lbl.TextSize = 13
+    Lbl.Font = Enum.Font.Gotham; Lbl.TextSize = 13
     Lbl.TextXAlignment = Enum.TextXAlignment.Left
     Lbl.Parent = Frame
 
@@ -416,8 +387,7 @@ local function makeSwitch(parent, text, yPos, options, default, callback)
     Container.Size = UDim2.new(0, 120, 0, 22)
     Container.Position = UDim2.new(1, -128, 0.5, -11)
     Container.BackgroundColor3 = Color3.fromRGB(20, 12, 30)
-    Container.BorderSizePixel = 0
-    Container.Parent = Frame
+    Container.BorderSizePixel = 0; Container.Parent = Frame
     Instance.new("UICorner", Container).CornerRadius = UDim.new(0, 5)
 
     for i, opt in ipairs(options) do
@@ -425,12 +395,9 @@ local function makeSwitch(parent, text, yPos, options, default, callback)
         b.Size = UDim2.new(1/#options, -2, 1, -4)
         b.Position = UDim2.new((i-1)/#options, 1, 0, 2)
         b.BackgroundColor3 = (opt == default) and Color3.fromRGB(150, 70, 220) or Color3.fromRGB(50, 30, 70)
-        b.Text = opt
-        b.TextColor3 = Color3.fromRGB(240, 220, 255)
-        b.Font = Enum.Font.GothamBold
-        b.TextSize = 11
-        b.BorderSizePixel = 0
-        b.Parent = Container
+        b.Text = opt; b.TextColor3 = Color3.fromRGB(240, 220, 255)
+        b.Font = Enum.Font.GothamBold; b.TextSize = 11
+        b.BorderSizePixel = 0; b.Parent = Container
         Instance.new("UICorner", b).CornerRadius = UDim.new(0, 4)
         track(b.MouseButton1Click:Connect(function()
             for _, other in ipairs(Container:GetChildren()) do
@@ -449,16 +416,14 @@ local function makeSlider(parent, text, yPos, min, max, default, callback)
     local Frame = Instance.new("Frame")
     Frame.Size = UDim2.new(1, -6, 0, 44)
     Frame.Position = UDim2.new(0, 3, 0, yPos)
-    Frame.BackgroundTransparency = 1
-    Frame.Parent = parent
+    Frame.BackgroundTransparency = 1; Frame.Parent = parent
 
     local Lbl = Instance.new("TextLabel")
     Lbl.Size = UDim2.new(1, 0, 0, 18)
     Lbl.BackgroundTransparency = 1
     Lbl.Text = text .. ": " .. default
     Lbl.TextColor3 = Color3.fromRGB(230, 200, 255)
-    Lbl.Font = Enum.Font.Gotham
-    Lbl.TextSize = 12
+    Lbl.Font = Enum.Font.Gotham; Lbl.TextSize = 12
     Lbl.TextXAlignment = Enum.TextXAlignment.Left
     Lbl.Parent = Frame
 
@@ -466,15 +431,13 @@ local function makeSlider(parent, text, yPos, min, max, default, callback)
     Bar.Size = UDim2.new(1, 0, 0, 14)
     Bar.Position = UDim2.new(0, 0, 0, 22)
     Bar.BackgroundColor3 = Color3.fromRGB(35, 20, 50)
-    Bar.BorderSizePixel = 0
-    Bar.Parent = Frame
+    Bar.BorderSizePixel = 0; Bar.Parent = Frame
     Instance.new("UICorner", Bar).CornerRadius = UDim.new(0, 7)
 
     local Fill = Instance.new("Frame")
     Fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
     Fill.BackgroundColor3 = Color3.fromRGB(150, 70, 220)
-    Fill.BorderSizePixel = 0
-    Fill.Parent = Bar
+    Fill.BorderSizePixel = 0; Fill.Parent = Bar
     Instance.new("UICorner", Fill).CornerRadius = UDim.new(0, 7)
 
     local dragging = false
@@ -500,32 +463,29 @@ local function makeSlider(parent, text, yPos, min, max, default, callback)
     return Frame
 end
 
--- ============ AIMBOT PAGE ============
+-- Aimbot page
 local ay = 4
 makeToggle(AimPage, "Aimbot Enabled", ay, Config.Aimbot.Enabled, function(v)
-    Config.Aimbot.Enabled = v
-    refreshAimPill()
+    Config.Aimbot.Enabled = v; refreshAimPill()
 end); ay = ay + 36
 makeSwitch(AimPage, "Target:", ay, {"Head", "Torso"}, Config.Aimbot.TargetPart, function(v) Config.Aimbot.TargetPart = v end); ay = ay + 36
 makeSwitch(AimPage, "Lock Mode:", ay, {"Hold Mouse", "Always"}, Config.Aimbot.LockMode, function(v) Config.Aimbot.LockMode = v end); ay = ay + 36
 makeToggle(AimPage, "Team Check", ay, Config.Aimbot.TeamCheck, function(v) Config.Aimbot.TeamCheck = v end); ay = ay + 36
 makeToggle(AimPage, "Wall Check", ay, Config.Aimbot.WallCheck, function(v) Config.Aimbot.WallCheck = v end); ay = ay + 36
 makeSlider(AimPage, "Aimbot FOV", ay, 30, 500, Config.Aimbot.FOV, function(v) Config.Aimbot.FOV = v end); ay = ay + 48
-makeSlider(AimPage, "Smoothness (1 soft - 100 hard)", ay, 1, 100, Config.Aimbot.Smoothness, function(v) Config.Aimbot.Smoothness = v end); ay = ay + 48
+makeSlider(AimPage, "Smoothness", ay, 1, 100, Config.Aimbot.Smoothness, function(v) Config.Aimbot.Smoothness = v end); ay = ay + 48
 AimPage.CanvasSize = UDim2.new(0, 0, 0, ay + 6)
 
--- ============ SILENT AIM PAGE ============
+-- Silent page
 local sy = 4
 makeToggle(SilentPage, "Silent Aim Enabled", sy, Config.SilentAim.Enabled, function(v) Config.SilentAim.Enabled = v end); sy = sy + 36
 makeSwitch(SilentPage, "Target:", sy, {"Head", "Torso"}, Config.SilentAim.TargetPart, function(v) Config.SilentAim.TargetPart = v end); sy = sy + 36
 makeToggle(SilentPage, "Team Check", sy, Config.SilentAim.TeamCheck, function(v) Config.SilentAim.TeamCheck = v end); sy = sy + 36
-makeToggle(SilentPage, "Wall Check", sy, Config.SilentAim.WallCheck, function(v) Config.SilentAim.WallCheck = v end); sy = sy + 36
 makeSlider(SilentPage, "Silent FOV", sy, 30, 500, Config.SilentAim.FOV, function(v) Config.SilentAim.FOV = v end); sy = sy + 48
 makeSlider(SilentPage, "Hit Chance %", sy, 0, 100, Config.SilentAim.HitChance, function(v) Config.SilentAim.HitChance = v end); sy = sy + 48
-makeSlider(SilentPage, "Sharpness (1 soft - 100 snap)", sy, 1, 100, Config.SilentAim.Sharpness, function(v) Config.SilentAim.Sharpness = v end); sy = sy + 48
 SilentPage.CanvasSize = UDim2.new(0, 0, 0, sy + 6)
 
--- ============ ESP PAGE ============
+-- ESP page
 local ey = 4
 makeToggle(EspPage, "ESP Enabled", ey, Config.ESP.Enabled, function(v) Config.ESP.Enabled = v end); ey = ey + 36
 makeToggle(EspPage, "Show Name", ey, Config.ESP.ShowName, function(v) Config.ESP.ShowName = v end); ey = ey + 36
@@ -541,67 +501,50 @@ Credit.Position = UDim2.new(0, 0, 1, -20)
 Credit.BackgroundTransparency = 1
 Credit.Text = "Made by Omar"
 Credit.TextColor3 = Color3.fromRGB(180, 100, 240)
-Credit.Font = Enum.Font.GothamBold
-Credit.TextSize = 12
+Credit.Font = Enum.Font.GothamBold; Credit.TextSize = 12
 Credit.Parent = Main
 
--- ============ FOV RINGS ============
+-- FOV rings
 local FovRing = Instance.new("Frame")
 FovRing.AnchorPoint = Vector2.new(0.5, 0.5)
-FovRing.BackgroundTransparency = 1
-FovRing.BorderSizePixel = 0
-FovRing.ZIndex = 1
-FovRing.Visible = false
-FovRing.Parent = ScreenGui
+FovRing.BackgroundTransparency = 1; FovRing.BorderSizePixel = 0
+FovRing.ZIndex = 1; FovRing.Visible = false; FovRing.Parent = ScreenGui
 Instance.new("UICorner", FovRing).CornerRadius = UDim.new(1, 0)
 local FovStrokeOuter = Instance.new("UIStroke", FovRing)
 FovStrokeOuter.Color = Color3.fromRGB(190, 110, 255)
-FovStrokeOuter.Thickness = 2.5
-FovStrokeOuter.Transparency = 0.1
+FovStrokeOuter.Thickness = 2.5; FovStrokeOuter.Transparency = 0.1
 
 local FovGlow = Instance.new("Frame")
 FovGlow.AnchorPoint = Vector2.new(0.5, 0.5)
 FovGlow.Position = UDim2.new(0.5, 0, 0.5, 0)
-FovGlow.BackgroundTransparency = 1
-FovGlow.BorderSizePixel = 0
-FovGlow.ZIndex = 0
-FovGlow.Visible = false
-FovGlow.Parent = ScreenGui
+FovGlow.BackgroundTransparency = 1; FovGlow.BorderSizePixel = 0
+FovGlow.ZIndex = 0; FovGlow.Visible = false; FovGlow.Parent = ScreenGui
 Instance.new("UICorner", FovGlow).CornerRadius = UDim.new(1, 0)
 local FovStrokeInner = Instance.new("UIStroke", FovGlow)
 FovStrokeInner.Color = Color3.fromRGB(255, 180, 255)
-FovStrokeInner.Thickness = 1
-FovStrokeInner.Transparency = 0.6
+FovStrokeInner.Thickness = 1; FovStrokeInner.Transparency = 0.6
 
 local CenterDot = Instance.new("Frame")
 CenterDot.Size = UDim2.new(0, 6, 0, 6)
 CenterDot.AnchorPoint = Vector2.new(0.5, 0.5)
 CenterDot.Position = UDim2.new(0.5, 0, 0.5, 0)
 CenterDot.BackgroundColor3 = Color3.fromRGB(220, 140, 255)
-CenterDot.BorderSizePixel = 0
-CenterDot.ZIndex = 2
-CenterDot.Visible = false
-CenterDot.Parent = ScreenGui
+CenterDot.BorderSizePixel = 0; CenterDot.ZIndex = 2
+CenterDot.Visible = false; CenterDot.Parent = ScreenGui
 Instance.new("UICorner", CenterDot).CornerRadius = UDim.new(1, 0)
 local CenterStroke = Instance.new("UIStroke", CenterDot)
 CenterStroke.Color = Color3.fromRGB(90, 40, 140)
 CenterStroke.Thickness = 1
 
--- Silent FOV ring (cyan)
 local SilentRing = Instance.new("Frame")
 SilentRing.AnchorPoint = Vector2.new(0.5, 0.5)
-SilentRing.BackgroundTransparency = 1
-SilentRing.BorderSizePixel = 0
-SilentRing.ZIndex = 1
-SilentRing.Visible = false
-SilentRing.Parent = ScreenGui
+SilentRing.BackgroundTransparency = 1; SilentRing.BorderSizePixel = 0
+SilentRing.ZIndex = 1; SilentRing.Visible = false; SilentRing.Parent = ScreenGui
 Instance.new("UICorner", SilentRing).CornerRadius = UDim.new(1, 0)
 local SilentStroke = Instance.new("UIStroke", SilentRing)
 SilentStroke.Color = Color3.fromRGB(120, 220, 255)
-SilentStroke.Thickness = 1.5
-SilentStroke.Transparency = 0.25
+SilentStroke.Thickness = 1.5; SilentStroke.Transparency = 0.25
 
--- Dots
 local TargetDot = Drawing.new("Circle")
 TargetDot.Thickness = 2; TargetDot.Color = Color3.fromRGB(255, 80, 255)
 TargetDot.Filled = false; TargetDot.Radius = 10; TargetDot.Transparency = 1; TargetDot.Visible = false
@@ -659,7 +602,7 @@ local function hasLineOfSight(targetPart)
     return hit == nil
 end
 
--- unified collector, filtered by whoever asks
+-- ============ NPC CACHE ============
 local npcCache, npcCacheTime = {}, 0
 local function refreshNpcCache()
     local now = tick()
@@ -788,8 +731,7 @@ local function drawESP(char, name)
     end
 
     if Config.ESP.ShowName then
-        d.Name.Visible = true
-        d.Name.Text = name
+        d.Name.Visible = true; d.Name.Text = name
         d.Name.Position = Vector2.new(headPos.X, topLeft.Y - 16)
     else d.Name.Visible = false end
 
@@ -831,6 +773,106 @@ track(UserInputService.InputEnded:Connect(function(input)
     end
 end))
 
+-- ============ SILENT AIM TARGET (nearest to crosshair, no walls) ============
+-- Silently picks nearest to crosshair, ALWAYS ignores wall-blocked targets.
+local function findSilentTarget()
+    local vp = Camera.ViewportSize
+    local center = Vector2.new(vp.X / 2, vp.Y / 2)
+    local origin = Camera.CFrame.Position
+    local bestPart, bestScore = nil, math.huge
+
+    local players, npcs = collectAll(Config.SilentAim.TeamCheck)
+
+    local function test(char)
+        local part = pickPart(char, Config.SilentAim.TargetPart)
+        if not part then return end
+        local worldDist = (origin - part.Position).Magnitude
+        if worldDist > Config.SilentAim.MaxDist then return end
+        -- ALWAYS skip targets behind walls (no toggle)
+        if not hasLineOfSight(part) then return end
+        local sp, on = Camera:WorldToViewportPoint(part.Position)
+        if not on or sp.Z <= 0 then return end
+        local screenDist = (Vector2.new(sp.X, sp.Y) - center).Magnitude
+        if screenDist > Config.SilentAim.FOV then return end
+        -- Score: nearest to crosshair + small world-distance tiebreak
+        local score = screenDist + (worldDist / 50)
+        if score < bestScore then
+            bestScore = score
+            bestPart = part
+        end
+    end
+
+    for _, char in ipairs(players) do test(char) end
+    for _, char in ipairs(npcs)    do test(char) end
+
+    return bestPart
+end
+
+-- ============ SILENT AIM RAY HOOK ============
+-- Intercepts Workspace:Raycast / RaycastAll and Workspace:FindPartOnRay family
+-- to redirect weapon fire toward the silent target without moving the camera.
+
+local originalRaycast    = Workspace.Raycast
+local originalRaycastAll = Workspace.RaycastAll
+
+local function shouldRedirect(origin, direction, params)
+    if not Config.SilentAim.Enabled then return false end
+    if not mouseHeld then return false end
+    if Config.SilentAim.HitChance <= 0 then return false end
+    if Config.SilentAim.HitChance < 100 then
+        if math.random(1, 100) > Config.SilentAim.HitChance then return false end
+    end
+
+    -- Only redirect if the ray looks like it came from the camera
+    local camOrigin = Camera.CFrame.Position
+    local camDir    = Camera.CFrame.LookVector
+    local originDelta = (origin - camOrigin).Magnitude
+    if originDelta > 8 then return false end      -- not a camera-origin ray
+
+    local dirDot = direction.Unit:Dot(camDir)
+    if dirDot < 0.5 then return false end          -- not firing forward
+
+    return true
+end
+
+local function buildRedirectRay(origin, direction, params)
+    local target = findSilentTarget()
+    if not target then return nil end
+    -- Ensure target not accidentally filtered out by caller's params
+    local tChar = target.Parent
+    if params and params.FilterDescendantsInstances then
+        for _, inst in ipairs(params.FilterDescendantsInstances) do
+            if inst == tChar or inst == target then
+                return nil
+            end
+        end
+    end
+    local newDir = (target.Position - origin)
+    return newDir, target
+end
+
+-- Hook Raycast
+Workspace.Raycast = function(self, origin, direction, params)
+    if self == Workspace and shouldRedirect(origin, direction, params) then
+        local newDir = buildRedirectRay(origin, direction, params)
+        if newDir then
+            return originalRaycast(self, origin, newDir, params)
+        end
+    end
+    return originalRaycast(self, origin, direction, params)
+end
+
+-- Hook RaycastAll
+Workspace.RaycastAll = function(self, origin, direction, params)
+    if self == Workspace and shouldRedirect(origin, direction, params) then
+        local newDir = buildRedirectRay(origin, direction, params)
+        if newDir then
+            return originalRaycastAll(self, origin, newDir, params)
+        end
+    end
+    return originalRaycastAll(self, origin, direction, params)
+end
+
 -- ============ AIMBOT ============
 local function findAimbotTarget()
     local vp = Camera.ViewportSize
@@ -849,7 +891,6 @@ local function findAimbotTarget()
     end
 
     local players, npcs = collectAll(Config.Aimbot.TeamCheck)
-
     local best, bestScore = nil, math.huge
     for _, char in ipairs(players) do
         local part = pickPart(char, Config.Aimbot.TargetPart)
@@ -859,7 +900,6 @@ local function findAimbotTarget()
         end
     end
     if best then return best end
-
     for _, char in ipairs(npcs) do
         local part = pickPart(char, Config.Aimbot.TargetPart)
         if part then
@@ -899,7 +939,6 @@ local function scorePart(part)
 end
 
 local function aimStep()
-    -- rings
     if Config.Aimbot.Enabled then
         local r = Config.Aimbot.FOV
         FovRing.Size = UDim2.new(0, r * 2, 0, r * 2)
@@ -912,6 +951,29 @@ local function aimStep()
     else
         FovRing.Visible = false; FovGlow.Visible = false; CenterDot.Visible = false
         TargetDot.Visible = false; TargetDotInner.Visible = false
+    end
+
+    -- Silent ring
+    if Config.SilentAim.Enabled then
+        local r = Config.SilentAim.FOV
+        SilentRing.Size = UDim2.new(0, r * 2, 0, r * 2)
+        SilentRing.Position = UDim2.new(0.5, 0, 0.5, 0)
+        SilentRing.Visible = true
+        local st = findSilentTarget()
+        if st then
+            local sp, on = Camera:WorldToViewportPoint(st.Position)
+            if on and sp.Z > 0 then
+                SilentDot.Visible = true
+                SilentDot.Position = Vector2.new(sp.X, sp.Y)
+            else
+                SilentDot.Visible = false
+            end
+        else
+            SilentDot.Visible = false
+        end
+    else
+        SilentRing.Visible = false
+        SilentDot.Visible = false
     end
 
     if not Config.Aimbot.Enabled then return end
@@ -994,186 +1056,74 @@ local function refreshBinding()
     end
 end
 
-local oldEnabled = Config.Aimbot.Enabled
-track(RunService.Heartbeat:Connect(function()
-    if Config.Aimbot.Enabled ~= oldEnabled then
-        oldEnabled = Config.Aimbot.Enabled
-        refreshBinding(); refreshAimPill()
-    end
-end))
-track(RunService.Stepped:Connect(function()
-    if Config.Aimbot.Enabled then return end
-    local char = LocalPlayer.Character
-    local hum = char and char:FindFirstChildOfClass("Humanoid")
-    if hum and not hum.AutoRotate then hum.AutoRotate = true end
-end))
+-- Ring + silent preview step (always runs to update the silent dot)
+if not bound then
+    RunService:BindToRenderStep("OmarHubUI", Enum.RenderPriority.Camera.Value + 1, function()
+        if Config.Aimbot.Enabled and not bound then
+            -- actual binding is handled below via Heartbeat watcher
+        end
+        -- draw the silent preview + rings every frame
+        if Config.Aimbot.Enabled then
+            local r = Config.Aimbot.FOV
+            FovRing.Size = UDim2.new(0, r * 2, 0, r * 2)
+            FovRing.Position = UDim2.new(0.5, 0, 0.5, 0)
+            FovRing.Visible = true
+            FovGlow.Size = UDim2.new(0, r * 2 + 6, 0, r * 2 + 6)
+            FovGlow.Position = UDim2.new(0.5, 0, 0.5, 0)
+            FovGlow.Visible = true
+            CenterDot.Visible = true
+        else
+            FovRing.Visible = false; FovGlow.Visible = false; CenterDot.Visible = false
+            TargetDot.Visible = false; TargetDotInner.Visible = false
+        end
+
+        if Config.SilentAim.Enabled then
+            local r = Config.SilentAim.FOV
+            SilentRing.Size = UDim2.new(0, r * 2, 0, r * 2)
+            SilentRing.Position = UDim2.new(0.5, 0, 0.5, 0)
+            SilentRing.Visible = true
+            local st = findSilentTarget()
+            if st then
+                local sp, on = Camera:WorldToViewportPoint(st.Position)
+                if on and sp.Z > 0 then
+                    SilentDot.Visible = true
+                    SilentDot.Position = Vector2.new(sp.X, sp.Y)
+                else
+                    SilentDot.Visible = false
+                end
+            else
+                SilentDot.Visible = false
+            end
+        else
+            SilentRing.Visible = false
+            SilentDot.Visible = false
+        end
+
+        -- Aimbot bind/step inline (so we don't need two binds)
+        if Config.Aimbot.Enabled then
+            if not bound then
+                RunService:BindToRenderStep(AIMBOT_BIND_NAME, Enum.RenderPriority.Camera.Value + 2, aimStep)
+                bound = true
+            end
+        else
+            if bound then
+                pcall(function() RunService:UnbindFromRenderStep(AIMBOT_BIND_NAME) end)
+                bound = false
+                currentTarget = nil; currentTargetScore = math.huge; targetStickTime = 0
+                local char = LocalPlayer.Character
+                local hum = char and char:FindFirstChildOfClass("Humanoid")
+                if hum then hum.AutoRotate = true end
+            end
+        end
+    end)
+    bound = false
+end
+
 track(LocalPlayer.CharacterAdded:Connect(function()
     task.wait(0.2)
     if not Config.Aimbot.Enabled then
         local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
         if hum then hum.AutoRotate = true end
-    end
-end))
-refreshBinding()
-
--- ============ SILENT AIM (independent) ============
-local function findSilentTarget()
-    local vp = Camera.ViewportSize
-    local center = Vector2.new(vp.X / 2, vp.Y / 2)
-    local origin = Camera.CFrame.Position
-
-    local function scoreFor(part)
-        local worldDist = (origin - part.Position).Magnitude
-        if worldDist > Config.SilentAim.MaxDist then return nil end
-        if Config.SilentAim.WallCheck and not hasLineOfSight(part) then return nil end
-        local sp, on = Camera:WorldToViewportPoint(part.Position)
-        if not on or sp.Z <= 0 then return nil end
-        local screenDist = (Vector2.new(sp.X, sp.Y) - center).Magnitude
-        if screenDist > Config.SilentAim.FOV then return nil end
-        return worldDist + (screenDist / 10)
-    end
-
-    local players, npcs = collectAll(Config.SilentAim.TeamCheck)
-
-    local best, bestScore = nil, math.huge
-    for _, char in ipairs(players) do
-        local part = pickPart(char, Config.SilentAim.TargetPart)
-        if part then
-            local s = scoreFor(part)
-            if s and s < bestScore then bestScore = s; best = part end
-        end
-    end
-    if best then return best end
-
-    for _, char in ipairs(npcs) do
-        local part = pickPart(char, Config.SilentAim.TargetPart)
-        if part then
-            local s = scoreFor(part)
-            if s and s < bestScore then bestScore = s; best = part end
-        end
-    end
-    return best
-end
-
-local SILENT_BIND_NAME = "OmarHubSilentAim"
-local silentBound = false
-local savedCameraCF = nil
-local savedMouseCF = nil
-local silentFramesActive = 0
-local silentPreviewTarget = nil
-
--- Silent aim step: runs at the HIGHEST priority so nothing else overwrites us
-local function silentStep()
-    -- ring UI
-    if Config.SilentAim.Enabled then
-        local r = Config.SilentAim.FOV
-        SilentRing.Size = UDim2.new(0, r * 2, 0, r * 2)
-        SilentRing.Position = UDim2.new(0.5, 0, 0.5, 0)
-        SilentRing.Visible = true
-    else
-        SilentRing.Visible = false
-        SilentDot.Visible = false
-    end
-
-    if not Config.SilentAim.Enabled then
-        -- restore anything we saved
-        if savedCameraCF then Camera.CFrame = savedCameraCF; savedCameraCF = nil end
-        savedMouseCF = nil
-        silentFramesActive = 0
-        return
-    end
-
-    -- Preview target (used for the cyan dot regardless of firing)
-    if not silentPreviewTarget or not targetIsValid(silentPreviewTarget, Config.SilentAim.WallCheck) then
-        silentPreviewTarget = findSilentTarget()
-    end
-    if silentPreviewTarget then
-        local sp, on = Camera:WorldToViewportPoint(silentPreviewTarget.Position)
-        if on and sp.Z > 0 then
-            SilentDot.Visible = true
-            SilentDot.Position = Vector2.new(sp.X, sp.Y)
-        else
-            SilentDot.Visible = false
-        end
-    else
-        SilentDot.Visible = false
-    end
-
-    -- If we have an active override from LAST frame, restore it now (start of new frame)
-    if silentFramesActive > 0 then
-        if savedCameraCF then Camera.CFrame = savedCameraCF end
-        savedCameraCF = nil
-        savedMouseCF = nil
-        silentFramesActive = 0
-    end
-
-    -- Fire only while the shoot button is held
-    if not mouseHeld then return end
-
-    -- Hit chance roll
-    if Config.SilentAim.HitChance <= 0 then return end
-    if Config.SilentAim.HitChance < 100 then
-        if math.random(1, 100) > Config.SilentAim.HitChance then return end
-    end
-
-    local target = silentPreviewTarget or findSilentTarget()
-    if not target or not target.Parent then return end
-
-    -- Save the visible camera & mouse CFrame
-    savedCameraCF = Camera.CFrame
-
-    -- Build redirect CFrame pointing at the target part
-    local origin = savedCameraCF.Position
-    local desired = CFrame.new(origin, target.Position)
-
-    -- Sharpness → lerp alpha. 100 = hard snap, 1 = soft pull on the redirect frame.
-    local alpha = math.clamp(Config.SilentAim.Sharpness / 100, 0.01, 1)
-    local redirectCF = savedCameraCF:Lerp(desired, alpha)
-
-    -- Apply overrides — this is what the weapon will raycast from THIS frame
-    Camera.CFrame = redirectCF
-    if Mouse then
-        pcall(function() Mouse.TargetFilter = nil end)
-        -- Mouse.Hit is derived from the camera + mouse position,
-        -- but if the weapon reads Mouse.UnitRay, override via the camera CFrame above is enough.
-    end
-
-    silentFramesActive = 1
-end
-
-local function refreshSilentBinding()
-    if Config.SilentAim.Enabled then
-        if not silentBound then
-            -- Highest priority: run AFTER everything else the game does
-            RunService:BindToRenderStep(SILENT_BIND_NAME, Enum.RenderPriority.Camera.Value + 2, silentStep)
-            silentBound = true
-        end
-    else
-        if silentBound then
-            pcall(function() RunService:UnbindFromRenderStep(SILENT_BIND_NAME) end)
-            silentBound = false
-        end
-        if savedCameraCF then Camera.CFrame = savedCameraCF; savedCameraCF = nil end
-        silentFramesActive = 0
-        SilentRing.Visible = false
-        SilentDot.Visible = false
-    end
-end
-
-local oldSilent = Config.SilentAim.Enabled
-track(RunService.Heartbeat:Connect(function()
-    if Config.SilentAim.Enabled ~= oldSilent then
-        oldSilent = Config.SilentAim.Enabled
-        refreshSilentBinding()
-    end
-end))
-refreshSilentBinding()
-
--- Also update the silent ring even when silent binding is off
-track(RunService.RenderStepped:Connect(function()
-    if not Config.SilentAim.Enabled then
-        SilentRing.Visible = false
-        SilentDot.Visible = false
     end
 end))
 
@@ -1222,10 +1172,11 @@ end))
 
 local function shutdown()
     pcall(function() RunService:UnbindFromRenderStep(AIMBOT_BIND_NAME) end)
-    pcall(function() RunService:UnbindFromRenderStep(SILENT_BIND_NAME) end)
-    bound, silentBound = false, false
-    if savedCameraCF then Camera.CFrame = savedCameraCF end
-    savedCameraCF = nil; savedMouseCF = nil; silentFramesActive = 0
+    pcall(function() RunService:UnbindFromRenderStep("OmarHubUI") end)
+    bound = false
+    -- restore workspace functions
+    pcall(function() Workspace.Raycast = originalRaycast end)
+    pcall(function() Workspace.RaycastAll = originalRaycastAll end)
     local char = LocalPlayer.Character
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     if hum then hum.AutoRotate = true end
