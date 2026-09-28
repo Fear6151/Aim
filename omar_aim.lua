@@ -1,5 +1,5 @@
 --[[
-    Omar Hub v11
+    Omar Hub v13
     Credit: Made by Omar
     For use ONLY in your own Roblox game.
 --]]
@@ -25,11 +25,11 @@ local Config = {
     Aimbot = {
         Enabled    = false,
         FOV        = 150,
-        TargetPart = "Head",       -- "Head" or "Torso"
+        TargetPart = "Head",
         TeamCheck  = true,
         MaxDist    = 1000,
-        Smoothness = 100,          -- 1 = soft, 100 = instant hard lock
-        LockMode   = "Hold Mouse", -- "Hold Mouse" | "Always"
+        Smoothness = 100,
+        LockMode   = "Hold Mouse",
     },
     ToggleKey = Enum.KeyCode.RightShift,
 }
@@ -116,29 +116,29 @@ CloseBtn.BorderSizePixel = 0
 CloseBtn.Parent = BtnRow
 Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
 
--- Floating reopen button
-local FloatBtn = Instance.new("TextButton")
-FloatBtn.Size = UDim2.new(0, 46, 0, 46)
-FloatBtn.Position = UDim2.new(0, 20, 0, 20)
-FloatBtn.BackgroundColor3 = Color3.fromRGB(90, 40, 140)
-FloatBtn.Text = "O"
-FloatBtn.TextColor3 = Color3.fromRGB(240, 210, 255)
-FloatBtn.Font = Enum.Font.GothamBold
-FloatBtn.TextSize = 20
-FloatBtn.BorderSizePixel = 0
-FloatBtn.Active = false
-FloatBtn.Draggable = false
-FloatBtn.ZIndex = 500
-FloatBtn.Visible = false
-FloatBtn.Parent = ScreenGui
-Instance.new("UICorner", FloatBtn).CornerRadius = UDim.new(1, 0)
+-- OMAR floating draggable pill
+local FloatPill = Instance.new("TextButton")
+FloatPill.Size = UDim2.new(0, 92, 0, 38)
+FloatPill.Position = UDim2.new(0, 12, 0, 90)
+FloatPill.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+FloatPill.Text = "OMAR"
+FloatPill.TextColor3 = Color3.fromRGB(180, 100, 240)
+FloatPill.Font = Enum.Font.GothamBold
+FloatPill.TextSize = 15
+FloatPill.BorderSizePixel = 0
+FloatPill.AutoButtonColor = false
+FloatPill.Active = true
+FloatPill.ZIndex = 500
+FloatPill.Visible = false
+FloatPill.Parent = ScreenGui
+Instance.new("UICorner", FloatPill).CornerRadius = UDim.new(0, 10)
 
-local FloatStroke = Instance.new("UIStroke", FloatBtn)
-FloatStroke.Color = Color3.fromRGB(180, 100, 255)
-FloatStroke.Thickness = 1.5
-FloatStroke.Transparency = 0.2
+local PillStroke = Instance.new("UIStroke", FloatPill)
+PillStroke.Color = Color3.fromRGB(150, 70, 220)
+PillStroke.Thickness = 1.5
+PillStroke.Transparency = 0.2
 
--- Drag main
+-- Drag main panel
 do
     local dragging, dragStart, startPos = false, nil, nil
     track(TitleBar.InputBegan:Connect(function(input)
@@ -166,6 +166,50 @@ do
     track(UserInputService.InputEnded:Connect(function(i)
         if i.UserInputType == Enum.UserInputType.MouseButton1
         or i.UserInputType == Enum.UserInputType.Touch then dragging = false end
+    end))
+end
+
+-- Drag OMAR pill
+do
+    local dragging, moved, dragStart, startPos = false, false, nil, nil
+    local function clamp(pos)
+        local vp = Camera.ViewportSize
+        local x = math.clamp(pos.X.Offset, 0, vp.X - FloatPill.Size.X.Offset)
+        local y = math.clamp(pos.Y.Offset, 0, vp.Y - FloatPill.Size.Y.Offset)
+        return UDim2.new(0, x, 0, y)
+    end
+    track(FloatPill.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+            dragging, moved, dragStart, startPos = true, false, input.Position, FloatPill.Position
+        end
+    end))
+    local function move(input)
+        if not dragging then return end
+        local d = input.Position - dragStart
+        if math.abs(d.X) > 4 or math.abs(d.Y) > 4 then moved = true end
+        FloatPill.Position = clamp(UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X,
+                                             startPos.Y.Scale, startPos.Y.Offset + d.Y))
+    end
+    track(FloatPill.InputChanged:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseMovement
+        or i.UserInputType == Enum.UserInputType.Touch then move(i) end
+    end))
+    track(UserInputService.InputChanged:Connect(function(i)
+        if not dragging then return end
+        if i.UserInputType == Enum.UserInputType.MouseMovement
+        or i.UserInputType == Enum.UserInputType.Touch then move(i) end
+    end))
+    track(UserInputService.InputEnded:Connect(function(i)
+        if not dragging then return end
+        if i.UserInputType == Enum.UserInputType.MouseButton1
+        or i.UserInputType == Enum.UserInputType.Touch then
+            if not moved then
+                Main.Visible = true
+                FloatPill.Visible = false
+            end
+            dragging, moved = false, false
+        end
     end))
 end
 
@@ -392,7 +436,7 @@ local function makeSlider(parent, text, yPos, min, max, default, callback)
     return Frame
 end
 
--- ============ ESP PAGE ============
+-- ============ PAGES ============
 local ey = 4
 makeToggle(EspPage, "ESP Enabled", ey, Config.ESP.Enabled, function(v) Config.ESP.Enabled = v end); ey = ey + 36
 makeToggle(EspPage, "Show Name", ey, Config.ESP.ShowName, function(v) Config.ESP.ShowName = v end); ey = ey + 36
@@ -402,7 +446,6 @@ makeToggle(EspPage, "Show Box", ey, Config.ESP.ShowBox, function(v) Config.ESP.S
 makeToggle(EspPage, "Team Check", ey, Config.ESP.TeamCheck, function(v) Config.ESP.TeamCheck = v end); ey = ey + 36
 EspPage.CanvasSize = UDim2.new(0, 0, 0, ey + 6)
 
--- ============ AIMBOT PAGE ============
 local ay = 4
 makeToggle(AimPage, "Aimbot Enabled", ay, Config.Aimbot.Enabled, function(v) Config.Aimbot.Enabled = v end); ay = ay + 36
 makeSwitch(AimPage, "Target:", ay, {"Head", "Torso"}, Config.Aimbot.TargetPart, function(v) Config.Aimbot.TargetPart = v end); ay = ay + 36
@@ -422,21 +465,50 @@ Credit.Font = Enum.Font.GothamBold
 Credit.TextSize = 12
 Credit.Parent = Main
 
--- FOV circle
-local FovCircle = Instance.new("Frame")
-FovCircle.AnchorPoint = Vector2.new(0.5, 0.5)
-FovCircle.BackgroundTransparency = 1
-FovCircle.BorderSizePixel = 0
-FovCircle.ZIndex = 0
-FovCircle.Parent = ScreenGui
-Instance.new("UICorner", FovCircle).CornerRadius = UDim.new(1, 0)
+-- ============ FOV CIRCLE (visible, thick, with ticks) ============
+local FovRing = Instance.new("Frame")
+FovRing.AnchorPoint = Vector2.new(0.5, 0.5)
+FovRing.BackgroundTransparency = 1
+FovRing.BorderSizePixel = 0
+FovRing.ZIndex = 1
+FovRing.Parent = ScreenGui
+Instance.new("UICorner", FovRing).CornerRadius = UDim.new(1, 0)
 
-local FovStroke = Instance.new("UIStroke", FovCircle)
-FovStroke.Color = Color3.fromRGB(180, 100, 255)
-FovStroke.Thickness = 1.5
-FovStroke.Transparency = 0.3
+-- Outer ring (bright)
+local FovStrokeOuter = Instance.new("UIStroke", FovRing)
+FovStrokeOuter.Color = Color3.fromRGB(190, 110, 255)
+FovStrokeOuter.Thickness = 2.5
+FovStrokeOuter.Transparency = 0.1
 
--- Target highlight dot (drawn on top of the target part)
+-- Inner ring (soft glow)
+local FovGlow = Instance.new("Frame")
+FovGlow.AnchorPoint = Vector2.new(0.5, 0.5)
+FovGlow.Position = UDim2.new(0.5, 0, 0.5, 0)
+FovGlow.BackgroundTransparency = 1
+FovGlow.BorderSizePixel = 0
+FovGlow.ZIndex = 0
+FovGlow.Parent = ScreenGui
+Instance.new("UICorner", FovGlow).CornerRadius = UDim.new(1, 0)
+local FovStrokeInner = Instance.new("UIStroke", FovGlow)
+FovStrokeInner.Color = Color3.fromRGB(255, 180, 255)
+FovStrokeInner.Thickness = 1
+FovStrokeInner.Transparency = 0.6
+
+-- Crosshair center dot (tells you where the FOV is measured from)
+local CenterDot = Instance.new("Frame")
+CenterDot.Size = UDim2.new(0, 6, 0, 6)
+CenterDot.AnchorPoint = Vector2.new(0.5, 0.5)
+CenterDot.Position = UDim2.new(0.5, 0, 0.5, 0)
+CenterDot.BackgroundColor3 = Color3.fromRGB(220, 140, 255)
+CenterDot.BorderSizePixel = 0
+CenterDot.ZIndex = 2
+CenterDot.Parent = ScreenGui
+Instance.new("UICorner", CenterDot).CornerRadius = UDim.new(1, 0)
+local CenterStroke = Instance.new("UIStroke", CenterDot)
+CenterStroke.Color = Color3.fromRGB(90, 40, 140)
+CenterStroke.Thickness = 1
+
+-- Target dots
 local TargetDot = Drawing.new("Circle")
 TargetDot.Thickness = 2
 TargetDot.Color = Color3.fromRGB(255, 80, 255)
@@ -460,18 +532,13 @@ local function isTeammate(player)
     if a == nil or b == nil then return false end
     return a == b
 end
-
-local function isAliveHumanoid(hum)
-    return hum and hum.Health > 0
-end
-
+local function isAliveHumanoid(hum) return hum and hum.Health > 0 end
 local function hasValidRig(model)
     if not model or not model.Parent then return false end
     local head = model:FindFirstChild("Head")
     local hrp  = model:FindFirstChild("HumanoidRootPart")
     return head and head:IsA("BasePart") and hrp and hrp:IsA("BasePart")
 end
-
 local function getTargetPart(char)
     if not hasValidRig(char) then return nil end
     if Config.Aimbot.TargetPart == "Head" then
@@ -486,7 +553,6 @@ local function getTargetPart(char)
     return nil
 end
 
--- ============ TARGET COLLECTION ============
 local function getPlayerTargets()
     local out = {}
     for _, player in ipairs(Players:GetPlayers()) do
@@ -498,24 +564,19 @@ local function getPlayerTargets()
         if Config.Aimbot.TeamCheck and isTeammate(player) then continue end
         if not hasValidRig(char) then continue end
         out[#out + 1] = {
-            character = char,
-            humanoid  = hum,
-            player    = player,
-            name      = (player.DisplayName ~= "" and player.DisplayName) or player.Name,
-            isNpc     = false,
+            character = char, humanoid = hum, player = player,
+            name = (player.DisplayName ~= "" and player.DisplayName) or player.Name,
+            isNpc = false,
         }
     end
     return out
 end
 
-local npcCache = {}
-local npcCacheTime = 0
-
+local npcCache, npcCacheTime = {}, 0
 local function refreshNpcCache()
     local now = tick()
     if now - npcCacheTime < 0.5 then return end
     npcCacheTime = now
-
     local out = {}
     local localChar = LocalPlayer.Character
     for _, hum in ipairs(Workspace:GetDescendants()) do
@@ -533,7 +594,6 @@ local function refreshNpcCache()
     end
     npcCache = out
 end
-
 local function getNpcTargets()
     refreshNpcCache()
     local out = {}
@@ -543,19 +603,15 @@ local function getNpcTargets()
         if not isAliveHumanoid(hum) then continue end
         if not hasValidRig(model) then continue end
         out[#out + 1] = {
-            character = model,
-            humanoid  = hum,
-            player    = nil,
-            name      = model.Name,
-            isNpc     = true,
+            character = model, humanoid = hum, player = nil,
+            name = model.Name, isNpc = true,
         }
     end
     return out
 end
 
--- ============ ESP DRAWINGS ============
+-- ============ ESP ============
 local espObjects = {}
-
 local function createESP(character)
     if espObjects[character] then return end
     local d = {
@@ -573,51 +629,40 @@ local function createESP(character)
     d.Box.Filled = false
     d.Box.Transparency = 1
     d.Box.Visible = false
-
     for _, line in ipairs({d.TL, d.TR, d.BL, d.BR}) do
         line.Thickness = 2
         line.Color = Color3.fromRGB(200, 130, 255)
         line.Transparency = 1
         line.Visible = false
     end
-
     d.HPBg.Filled = true
     d.HPBg.Color = Color3.fromRGB(0, 0, 0)
     d.HPBg.Transparency = 0.5
     d.HPBg.Visible = false
-
     d.HPOutline.Filled = false
     d.HPOutline.Color = Color3.fromRGB(20, 10, 30)
     d.HPOutline.Thickness = 1
     d.HPOutline.Transparency = 1
     d.HPOutline.Visible = false
-
     d.HP.Filled = true
     d.HP.Color = Color3.fromRGB(0, 255, 0)
     d.HP.Transparency = 1
     d.HP.Visible = false
-
     for _, t in ipairs({d.Name, d.Distance}) do
-        t.Size = 14
-        t.Center = true
-        t.Outline = true
+        t.Size = 14; t.Center = true; t.Outline = true
         t.OutlineColor = Color3.fromRGB(0, 0, 0)
         t.Color = Color3.fromRGB(255, 255, 255)
-        t.Font = 2
-        t.Visible = false
+        t.Font = 2; t.Visible = false
     end
     d.Name.Color = Color3.fromRGB(220, 180, 255)
     d.Distance.Color = Color3.fromRGB(200, 140, 255)
-
     espObjects[character] = d
 end
 
 local function removeESP(character)
     local d = espObjects[character]
     if not d then return end
-    for _, obj in pairs(d) do
-        pcall(function() obj:Remove() end)
-    end
+    for _, obj in pairs(d) do pcall(function() obj:Remove() end) end
     espObjects[character] = nil
 end
 
@@ -632,24 +677,20 @@ track(Players.PlayerRemoving:Connect(function(player)
     if player.Character then removeESP(player.Character) end
 end))
 
--- ============ ESP DRAW ============
 local function drawESP(t)
     local char = t.character
     if not espObjects[char] then createESP(char) end
     local d = espObjects[char]
-
     local hrp  = char:FindFirstChild("HumanoidRootPart")
     local head = char:FindFirstChild("Head")
     if not (hrp and head) then setAllVisible(d, false); return end
 
     local headPos, onScreen = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
     local rootPos = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3, 0))
-
     if not onScreen or headPos.Z < 0 then setAllVisible(d, false); return end
 
     local height = math.abs(rootPos.Y - headPos.Y)
     local width = height * 0.6
-
     if height > Config.ESP.MaxBoxPixels or width > Config.ESP.MaxBoxPixels then
         setAllVisible(d, false); return
     end
@@ -680,46 +721,30 @@ local function drawESP(t)
         d.Name.Visible = true
         d.Name.Text = t.name
         d.Name.Position = Vector2.new(headPos.X, topLeft.Y - 16)
-    else
-        d.Name.Visible = false
-    end
+    else d.Name.Visible = false end
 
     if Config.ESP.ShowDistance then
         d.Distance.Visible = true
         local dist = (Camera.CFrame.Position - hrp.Position).Magnitude
         d.Distance.Text = string.format("[%d studs]", math.floor(dist))
         d.Distance.Position = Vector2.new(headPos.X, bottomRight.Y + 2)
-    else
-        d.Distance.Visible = false
-    end
+    else d.Distance.Visible = false end
 
     if Config.ESP.ShowHealth then
         local hpPct = math.clamp(t.humanoid.Health / t.humanoid.MaxHealth, 0, 1)
         local barH = boxSize.Y
         local barX = bottomRight.X + 4
-
-        d.HPBg.Visible = true
-        d.HPBg.Size = Vector2.new(4, barH)
-        d.HPBg.Position = Vector2.new(barX, topLeft.Y)
-
-        d.HPOutline.Visible = true
-        d.HPOutline.Size = Vector2.new(4, barH)
-        d.HPOutline.Position = Vector2.new(barX, topLeft.Y)
-
-        d.HP.Visible = true
-        d.HP.Size = Vector2.new(4, barH * hpPct)
-        d.HP.Position = Vector2.new(barX, topLeft.Y + barH * (1 - hpPct))
+        d.HPBg.Visible = true; d.HPBg.Size = Vector2.new(4, barH); d.HPBg.Position = Vector2.new(barX, topLeft.Y)
+        d.HPOutline.Visible = true; d.HPOutline.Size = Vector2.new(4, barH); d.HPOutline.Position = Vector2.new(barX, topLeft.Y)
+        d.HP.Visible = true; d.HP.Size = Vector2.new(4, barH * hpPct); d.HP.Position = Vector2.new(barX, topLeft.Y + barH * (1 - hpPct))
         d.HP.Color = Color3.fromRGB(math.floor(255 * (1 - hpPct)), math.floor(255 * hpPct), 0)
     else
-        d.HP.Visible = false
-        d.HPBg.Visible = false
-        d.HPOutline.Visible = false
+        d.HP.Visible = false; d.HPBg.Visible = false; d.HPOutline.Visible = false
     end
 end
 
--- ============ MOUSE STATE (for hold-to-lock) ============
+-- ============ MOUSE STATE ============
 local mouseHeld = false
-
 track(UserInputService.InputBegan:Connect(function(input, gp)
     if gp then return end
     if input.UserInputType == Enum.UserInputType.MouseButton1
@@ -741,7 +766,6 @@ local function findBestTarget()
     local vp = Camera.ViewportSize
     local center = Vector2.new(vp.X / 2, vp.Y / 2)
     local origin = Camera.CFrame.Position
-
     local bestPlayer, bestPlayerDist = nil, math.huge
     local bestNpc,    bestNpcDist    = nil, math.huge
 
@@ -754,14 +778,12 @@ local function findBestTarget()
                 if on and sp.Z > 0 then
                     local sd = (Vector2.new(sp.X, sp.Y) - center).Magnitude
                     if sd <= Config.Aimbot.FOV and sd < bestPlayerDist then
-                        bestPlayerDist = sd
-                        bestPlayer = part
+                        bestPlayerDist = sd; bestPlayer = part
                     end
                 end
             end
         end
     end
-
     if bestPlayer then return bestPlayer end
 
     for _, t in ipairs(getNpcTargets()) do
@@ -773,8 +795,7 @@ local function findBestTarget()
                 if on and sp.Z > 0 then
                     local sd = (Vector2.new(sp.X, sp.Y) - center).Magnitude
                     if sd <= Config.Aimbot.FOV and sd < bestNpcDist then
-                        bestNpcDist = sd
-                        bestNpc = part
+                        bestNpcDist = sd; bestNpc = part
                     end
                 end
             end
@@ -788,8 +809,7 @@ local bound = false
 local currentTarget = nil
 
 local function targetIsValid(part)
-    if not part then return false end
-    if not part.Parent then return false end
+    if not part or not part.Parent then return false end
     if not part:IsDescendantOf(Workspace) then return false end
     local char = part.Parent
     local hum = char and char:FindFirstChildOfClass("Humanoid")
@@ -797,39 +817,29 @@ local function targetIsValid(part)
 end
 
 local function aimStep()
-    if not Config.Aimbot.Enabled then
+    -- FOV ring visibility
+    if Config.Aimbot.Enabled then
+        local radius = Config.Aimbot.FOV
+        FovRing.Size = UDim2.new(0, radius * 2, 0, radius * 2)
+        FovRing.Position = UDim2.new(0.5, 0, 0.5, 0)
+        FovRing.Visible = true
+        FovGlow.Size = UDim2.new(0, radius * 2 + 6, 0, radius * 2 + 6)
+        FovGlow.Position = UDim2.new(0.5, 0, 0.5, 0)
+        FovGlow.Visible = true
+        CenterDot.Visible = true
+    else
+        FovRing.Visible = false
+        FovGlow.Visible = false
+        CenterDot.Visible = false
         TargetDot.Visible = false
         TargetDotInner.Visible = false
         return
     end
 
-    -- Hold-to-lock gate
-    if Config.Aimbot.LockMode == "Hold Mouse" and not mouseHeld then
-        -- Still show target dot while player is inside FOV so user knows who's next
-        local peek = currentTarget
-        if not targetIsValid(peek) then
-            peek = findBestTarget()
-            currentTarget = peek
-        end
-        if peek then
-            local sp, on = Camera:WorldToViewportPoint(peek.Position)
-            if on and sp.Z > 0 then
-                TargetDot.Visible = true
-                TargetDot.Position = Vector2.new(sp.X, sp.Y)
-                TargetDotInner.Visible = true
-                TargetDotInner.Position = Vector2.new(sp.X, sp.Y)
-            else
-                TargetDot.Visible = false
-                TargetDotInner.Visible = false
-            end
-        else
-            TargetDot.Visible = false
-            TargetDotInner.Visible = false
-        end
-        return
-    end
+    -- Hold-Mouse gate: don't do anything (no lock, no char rotation) unless firing
+    local gated = (Config.Aimbot.LockMode == "Hold Mouse") and not mouseHeld
 
-    -- Validate / re-acquire
+    -- Always try to preview the target (so the pink dot shows even when idle)
     if not targetIsValid(currentTarget) then
         currentTarget = nil
     end
@@ -845,23 +855,25 @@ local function aimStep()
         currentTarget = findBestTarget()
     end
 
-    if not currentTarget then
-        TargetDot.Visible = false
-        TargetDotInner.Visible = false
-        return
-    end
-
-    -- Draw the target indicator
-    local sp, on = Camera:WorldToViewportPoint(currentTarget.Position)
-    if on and sp.Z > 0 then
-        TargetDot.Visible = true
-        TargetDot.Position = Vector2.new(sp.X, sp.Y)
-        TargetDotInner.Visible = true
-        TargetDotInner.Position = Vector2.new(sp.X, sp.Y)
+    -- Draw the target dot (always, whether firing or not)
+    if currentTarget then
+        local sp, on = Camera:WorldToViewportPoint(currentTarget.Position)
+        if on and sp.Z > 0 then
+            TargetDot.Visible = true
+            TargetDot.Position = Vector2.new(sp.X, sp.Y)
+            TargetDotInner.Visible = true
+            TargetDotInner.Position = Vector2.new(sp.X, sp.Y)
+        else
+            TargetDot.Visible = false
+            TargetDotInner.Visible = false
+        end
     else
         TargetDot.Visible = false
         TargetDotInner.Visible = false
     end
+
+    -- If gated (Hold Mouse and not firing), do NOT lock camera / rotate character
+    if gated or not currentTarget then return end
 
     local aimPos = currentTarget.Position
     local alpha = math.clamp(Config.Aimbot.Smoothness / 100, 0.01, 1)
@@ -871,7 +883,7 @@ local function aimStep()
     local desiredCF = CFrame.new(curCF.Position, aimPos)
     Camera.CFrame = curCF:Lerp(desiredCF, alpha)
 
-    -- Character rotation lock (only when locking fairly hard)
+    -- Character rotation lock — only when locked fairly hard
     if alpha >= 0.4 then
         local char = LocalPlayer.Character
         local hrp  = char and char:FindFirstChild("HumanoidRootPart")
@@ -896,6 +908,9 @@ local function refreshBinding()
         currentTarget = nil
         TargetDot.Visible = false
         TargetDotInner.Visible = false
+        FovRing.Visible = false
+        FovGlow.Visible = false
+        CenterDot.Visible = false
         if bound then
             pcall(function() RunService:UnbindFromRenderStep(AIMBOT_BIND_NAME) end)
             bound = false
@@ -914,6 +929,7 @@ track(RunService.Heartbeat:Connect(function()
     end
 end))
 
+-- If aimbot is off, ensure AutoRotate stays on
 track(RunService.Stepped:Connect(function()
     if Config.Aimbot.Enabled then return end
     local char = LocalPlayer.Character
@@ -933,19 +949,10 @@ refreshBinding()
 
 -- ============ ESP RENDER ============
 track(RunService.RenderStepped:Connect(function()
-    if Config.Aimbot.Enabled and Main.Visible then
-        FovCircle.Visible = true
-        FovCircle.Size = UDim2.new(0, Config.Aimbot.FOV * 2, 0, Config.Aimbot.FOV * 2)
-        FovCircle.Position = UDim2.new(0.5, 0, 0.5, 0)
-    else
-        FovCircle.Visible = false
-    end
-
     if not Config.ESP.Enabled then
         for _, d in pairs(espObjects) do setAllVisible(d, false) end
         return
     end
-
     local liveChars = {}
     for _, t in ipairs(getPlayerTargets()) do
         liveChars[t.character] = true
@@ -963,18 +970,15 @@ end))
 -- ============ TOGGLE / CLOSE ============
 local function setUIVisible(vis)
     Main.Visible = vis
-    FloatBtn.Visible = not vis
-    if not vis then FovCircle.Visible = false end
+    FloatPill.Visible = not vis
 end
 
-track(ToggleBtn.MouseButton1Click:Connect(function()
-    setUIVisible(false)
+track(ToggleBtn.MouseButton1Click:Connect(function() setUIVisible(false) end))
+track(FloatPill.MouseButton1Click:Connect(function()
+    -- Only fires if not dragging (handled by the drag code above)
+    Main.Visible = true
+    FloatPill.Visible = false
 end))
-
-track(FloatBtn.MouseButton1Click:Connect(function()
-    setUIVisible(true)
-end))
-
 track(UserInputService.InputBegan:Connect(function(input, gp)
     if gp then return end
     if input.KeyCode == Config.ToggleKey then
@@ -985,25 +989,17 @@ end))
 local function shutdown()
     pcall(function() RunService:UnbindFromRenderStep(AIMBOT_BIND_NAME) end)
     bound = false
-
     local char = LocalPlayer.Character
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     if hum then hum.AutoRotate = true end
-
     for _, d in pairs(espObjects) do
-        for _, obj in pairs(d) do
-            pcall(function() obj:Remove() end)
-        end
+        for _, obj in pairs(d) do pcall(function() obj:Remove() end) end
     end
     espObjects = {}
     pcall(function() TargetDot:Remove() end)
     pcall(function() TargetDotInner:Remove() end)
-
-    for _, c in ipairs(connections) do
-        pcall(function() c:Disconnect() end)
-    end
+    for _, c in ipairs(connections) do pcall(function() c:Disconnect() end) end
     connections = {}
-
     pcall(function() ScreenGui:Destroy() end)
 end
 
