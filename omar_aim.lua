@@ -1,5 +1,5 @@
 --[[
-    Omar Hub v32 — v20 base + silent aim fixed
+    Omar Hub v34
     Credit: Made by Omar
     For use ONLY in your own Roblox game.
 --]]
@@ -20,7 +20,6 @@ local Config = {
         ShowHealth   = true,
         ShowBox      = true,
         TeamCheck    = false,
-        MaxBoxPixels = 1200,
     },
     Aimbot = {
         Enabled    = false,
@@ -29,15 +28,7 @@ local Config = {
         TeamCheck  = false,
         MaxDist    = 1000,
         Smoothness = 100,
-        LockMode   = "Hold Mouse",
-        WallCheck  = false,
-    },
-    SilentAim = {
-        Enabled    = false,
-        FOV        = 220,
-        TargetPart = "Head",
-        TeamCheck  = false,
-        HitChance  = 100,
+        LockMode   = "Hold Mouse", -- "Hold Mouse" | "Always"
     },
     ToggleKey = Enum.KeyCode.RightShift,
 }
@@ -124,7 +115,7 @@ CloseBtn.BorderSizePixel = 0
 CloseBtn.Parent = BtnRow
 Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
 
--- OMAR pill
+-- Floating OMAR pill (opens menu)
 local FloatPill = Instance.new("TextButton")
 FloatPill.Size = UDim2.new(0, 72, 0, 28)
 FloatPill.Position = UDim2.new(0, 14, 1, -80)
@@ -143,6 +134,87 @@ Instance.new("UICorner", FloatPill).CornerRadius = UDim.new(0, 6)
 local PillStroke = Instance.new("UIStroke", FloatPill)
 PillStroke.Color = Color3.fromRGB(150, 70, 220)
 PillStroke.Thickness = 1.5
+
+-- Floating AIM pill (quick aimbot toggle)
+local AimPill = Instance.new("TextButton")
+AimPill.Size = UDim2.new(0, 72, 0, 28)
+AimPill.Position = UDim2.new(0, 14, 1, -46)
+AimPill.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+AimPill.Text = "AIM: OFF"
+AimPill.TextColor3 = Color3.fromRGB(200, 90, 120)
+AimPill.Font = Enum.Font.GothamBold
+AimPill.TextSize = 12
+AimPill.BorderSizePixel = 0
+AimPill.AutoButtonColor = false
+AimPill.Active = true
+AimPill.ZIndex = 500
+AimPill.Visible = false
+AimPill.Parent = ScreenGui
+Instance.new("UICorner", AimPill).CornerRadius = UDim.new(0, 6)
+local AimStroke = Instance.new("UIStroke", AimPill)
+AimStroke.Color = Color3.fromRGB(200, 60, 100)
+AimStroke.Thickness = 1.5
+
+local function refreshAimPill()
+    if Config.Aimbot.Enabled then
+        AimPill.Text = "AIM: ON"
+        AimPill.TextColor3 = Color3.fromRGB(120, 255, 160)
+        AimStroke.Color = Color3.fromRGB(80, 220, 130)
+    else
+        AimPill.Text = "AIM: OFF"
+        AimPill.TextColor3 = Color3.fromRGB(200, 90, 120)
+        AimStroke.Color = Color3.fromRGB(200, 60, 100)
+    end
+end
+refreshAimPill()
+
+-- Drag helper
+local function makeDraggable(button, onTap)
+    local dragging, moved, dragStart, startPos = false, false, nil, nil
+    local function clamp(pos)
+        local vp = Camera.ViewportSize
+        local size = button.AbsoluteSize
+        local w = size.X > 0 and size.X or button.Size.X.Offset
+        local h = size.Y > 0 and size.Y or button.Size.Y.Offset
+        return UDim2.new(0, math.clamp(pos.X.Offset, 0, vp.X - w),
+                         0, math.clamp(pos.Y.Offset, 0, vp.Y - h))
+    end
+    track(button.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+            dragging, moved, dragStart, startPos = true, false, input.Position, button.Position
+        end
+    end))
+    track(UserInputService.InputChanged:Connect(function(input)
+        if not dragging then return end
+        if input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch then
+            local d = input.Position - dragStart
+            if math.abs(d.X) > 3 or math.abs(d.Y) > 3 then moved = true end
+            button.Position = clamp(UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X,
+                                              startPos.Y.Scale, startPos.Y.Offset + d.Y))
+        end
+    end))
+    track(UserInputService.InputEnded:Connect(function(input)
+        if not dragging then return end
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+            if not moved and onTap then onTap() end
+            dragging, moved = false, false
+        end
+    end))
+end
+
+makeDraggable(FloatPill, function()
+    Main.Visible = true
+    FloatPill.Visible = false
+    AimPill.Visible = false
+end)
+
+makeDraggable(AimPill, function()
+    Config.Aimbot.Enabled = not Config.Aimbot.Enabled
+    refreshAimPill()
+end)
 
 -- Drag main
 do
@@ -196,9 +268,8 @@ local function makeTab(name, order, total)
     Instance.new("UICorner", tab).CornerRadius = UDim.new(0, 5)
     return tab
 end
-local AimTabBtn    = makeTab("Aimbot", 1, 3)
-local SilentTabBtn = makeTab("Silent", 2, 3)
-local EspTabBtn    = makeTab("ESP",    3, 3)
+local AimTabBtn = makeTab("Aimbot", 1, 2)
+local EspTabBtn = makeTab("ESP", 2, 2)
 
 local Body = Instance.new("Frame")
 Body.Size = UDim2.new(1, -20, 1, -116)
@@ -212,18 +283,8 @@ AimPage.BackgroundTransparency = 1
 AimPage.BorderSizePixel = 0
 AimPage.ScrollBarThickness = 3
 AimPage.ScrollBarImageColor3 = Color3.fromRGB(140, 60, 220)
-AimPage.CanvasSize = UDim2.new(0, 0, 0, 340)
+AimPage.CanvasSize = UDim2.new(0, 0, 0, 300)
 AimPage.Parent = Body
-
-local SilentPage = Instance.new("ScrollingFrame")
-SilentPage.Size = UDim2.new(1, 0, 1, 0)
-SilentPage.BackgroundTransparency = 1
-SilentPage.BorderSizePixel = 0
-SilentPage.ScrollBarThickness = 3
-SilentPage.ScrollBarImageColor3 = Color3.fromRGB(140, 60, 220)
-SilentPage.CanvasSize = UDim2.new(0, 0, 0, 340)
-SilentPage.Visible = false
-SilentPage.Parent = Body
 
 local EspPage = Instance.new("ScrollingFrame")
 EspPage.Size = UDim2.new(1, 0, 1, 0)
@@ -236,18 +297,18 @@ EspPage.Visible = false
 EspPage.Parent = Body
 
 local function setActiveTab(which)
-    local map = { aim = AimPage, silent = SilentPage, esp = EspPage }
-    local btns = { aim = AimTabBtn, silent = SilentTabBtn, esp = EspTabBtn }
-    for k, page in pairs(map) do
-        page.Visible = (k == which)
-        btns[k].BackgroundColor3 = (k == which)
-            and Color3.fromRGB(90, 40, 140)
-            or  Color3.fromRGB(40, 20, 60)
+    if which == "esp" then
+        EspPage.Visible = true; AimPage.Visible = false
+        EspTabBtn.BackgroundColor3 = Color3.fromRGB(90, 40, 140)
+        AimTabBtn.BackgroundColor3 = Color3.fromRGB(40, 20, 60)
+    else
+        EspPage.Visible = false; AimPage.Visible = true
+        EspTabBtn.BackgroundColor3 = Color3.fromRGB(40, 20, 60)
+        AimTabBtn.BackgroundColor3 = Color3.fromRGB(90, 40, 140)
     end
 end
 setActiveTab("aim")
 track(AimTabBtn.MouseButton1Click:Connect(function() setActiveTab("aim") end))
-track(SilentTabBtn.MouseButton1Click:Connect(function() setActiveTab("silent") end))
 track(EspTabBtn.MouseButton1Click:Connect(function() setActiveTab("esp") end))
 
 -- ============ WIDGETS ============
@@ -391,25 +452,19 @@ local function makeSlider(parent, text, yPos, min, max, default, callback)
     return Frame
 end
 
--- Pages
+-- Aimbot page
 local ay = 4
-makeToggle(AimPage, "Aimbot Enabled", ay, Config.Aimbot.Enabled, function(v) Config.Aimbot.Enabled = v end); ay = ay + 36
+makeToggle(AimPage, "Aimbot Enabled", ay, Config.Aimbot.Enabled, function(v)
+    Config.Aimbot.Enabled = v; refreshAimPill()
+end); ay = ay + 36
 makeSwitch(AimPage, "Target:", ay, {"Head", "Torso"}, Config.Aimbot.TargetPart, function(v) Config.Aimbot.TargetPart = v end); ay = ay + 36
 makeSwitch(AimPage, "Lock Mode:", ay, {"Hold Mouse", "Always"}, Config.Aimbot.LockMode, function(v) Config.Aimbot.LockMode = v end); ay = ay + 36
 makeToggle(AimPage, "Team Check", ay, Config.Aimbot.TeamCheck, function(v) Config.Aimbot.TeamCheck = v end); ay = ay + 36
-makeToggle(AimPage, "Wall Check", ay, Config.Aimbot.WallCheck, function(v) Config.Aimbot.WallCheck = v end); ay = ay + 36
 makeSlider(AimPage, "Aimbot FOV", ay, 30, 500, Config.Aimbot.FOV, function(v) Config.Aimbot.FOV = v end); ay = ay + 48
-makeSlider(AimPage, "Smoothness", ay, 1, 100, Config.Aimbot.Smoothness, function(v) Config.Aimbot.Smoothness = v end); ay = ay + 48
+makeSlider(AimPage, "Smoothness (1 soft - 100 hard)", ay, 1, 100, Config.Aimbot.Smoothness, function(v) Config.Aimbot.Smoothness = v end); ay = ay + 48
 AimPage.CanvasSize = UDim2.new(0, 0, 0, ay + 6)
 
-local sy = 4
-makeToggle(SilentPage, "Silent Aim Enabled", sy, Config.SilentAim.Enabled, function(v) Config.SilentAim.Enabled = v end); sy = sy + 36
-makeSwitch(SilentPage, "Target:", sy, {"Head", "Torso"}, Config.SilentAim.TargetPart, function(v) Config.SilentAim.TargetPart = v end); sy = sy + 36
-makeToggle(SilentPage, "Team Check", sy, Config.SilentAim.TeamCheck, function(v) Config.SilentAim.TeamCheck = v end); sy = sy + 36
-makeSlider(SilentPage, "Silent FOV", sy, 30, 500, Config.SilentAim.FOV, function(v) Config.SilentAim.FOV = v end); sy = sy + 48
-makeSlider(SilentPage, "Hit Chance %", sy, 0, 100, Config.SilentAim.HitChance, function(v) Config.SilentAim.HitChance = v end); sy = sy + 48
-SilentPage.CanvasSize = UDim2.new(0, 0, 0, sy + 6)
-
+-- ESP page
 local ey = 4
 makeToggle(EspPage, "ESP Enabled", ey, Config.ESP.Enabled, function(v) Config.ESP.Enabled = v end); ey = ey + 36
 makeToggle(EspPage, "Show Name", ey, Config.ESP.ShowName, function(v) Config.ESP.ShowName = v end); ey = ey + 36
@@ -428,7 +483,7 @@ Credit.TextColor3 = Color3.fromRGB(180, 100, 240)
 Credit.Font = Enum.Font.GothamBold; Credit.TextSize = 12
 Credit.Parent = Main
 
--- ============ FOV RINGS ============
+-- FOV ring
 local FovRing = Instance.new("Frame")
 FovRing.AnchorPoint = Vector2.new(0.5, 0.5)
 FovRing.BackgroundTransparency = 1
@@ -441,19 +496,6 @@ local FovStroke = Instance.new("UIStroke", FovRing)
 FovStroke.Color = Color3.fromRGB(190, 110, 255)
 FovStroke.Thickness = 2.5
 FovStroke.Transparency = 0.1
-
-local SilentRing = Instance.new("Frame")
-SilentRing.AnchorPoint = Vector2.new(0.5, 0.5)
-SilentRing.BackgroundTransparency = 1
-SilentRing.BorderSizePixel = 0
-SilentRing.ZIndex = 3
-SilentRing.Visible = false
-SilentRing.Parent = ScreenGui
-Instance.new("UICorner", SilentRing).CornerRadius = UDim.new(1, 0)
-local SilentStroke = Instance.new("UIStroke", SilentRing)
-SilentStroke.Color = Color3.fromRGB(120, 220, 255)
-SilentStroke.Thickness = 2
-SilentStroke.Transparency = 0.1
 
 -- ============ HELPERS ============
 local function isTeammate(player, teamCheckOn)
@@ -484,19 +526,6 @@ local function pickPart(char, partName)
         or char:FindFirstChild("HumanoidRootPart")
 end
 
-local function hasLineOfSight(targetPart)
-    if not targetPart then return false end
-    local myChar = LocalPlayer.Character
-    local myHead = myChar and myChar:FindFirstChild("Head")
-    if not myHead then return true end
-    local params = RaycastParams.new()
-    params.FilterType = Enum.RaycastFilterType.Exclude
-    params.FilterDescendantsInstances = { myChar, targetPart.Parent }
-    params.IgnoreWater = true
-    local hit = Workspace:Raycast(myHead.Position, targetPart.Position - myHead.Position, params)
-    return hit == nil
-end
-
 local function getCharTargets(teamCheckOn)
     local out = {}
     for _, p in ipairs(Players:GetPlayers()) do
@@ -511,13 +540,12 @@ local function getCharTargets(teamCheckOn)
     return out
 end
 
--- ============ ESP ============
+-- ============ ESP (Highlight + BillboardGui — no Drawing) ============
 local espObjects = {}
 
 local function createESP(character)
     if espObjects[character] then return end
     local hl = Instance.new("Highlight")
-    hl.Name = "OmarHL"
     hl.FillColor = Color3.fromRGB(120, 50, 200)
     hl.FillTransparency = 0.7
     hl.OutlineColor = Color3.fromRGB(200, 130, 255)
@@ -602,7 +630,7 @@ track(Players.PlayerRemoving:Connect(function(p)
 end))
 
 track(RunService.RenderStepped:Connect(function()
-    -- FOV rings
+    -- FOV ring
     if Config.Aimbot.Enabled then
         local r = Config.Aimbot.FOV
         FovRing.Size = UDim2.new(0, r * 2, 0, r * 2)
@@ -610,15 +638,6 @@ track(RunService.RenderStepped:Connect(function()
         FovRing.Visible = true
     else
         FovRing.Visible = false
-    end
-
-    if Config.SilentAim.Enabled then
-        local r = Config.SilentAim.FOV
-        SilentRing.Size = UDim2.new(0, r * 2, 0, r * 2)
-        SilentRing.Position = UDim2.new(0.5, 0, 0.5, 0)
-        SilentRing.Visible = true
-    else
-        SilentRing.Visible = false
     end
 
     -- ESP
@@ -705,18 +724,16 @@ local function findAimbotTarget()
     for _, char in ipairs(getCharTargets(Config.Aimbot.TeamCheck)) do
         local part = pickPart(char, Config.Aimbot.TargetPart)
         if part then
-            if not Config.Aimbot.WallCheck or hasLineOfSight(part) then
-                local worldDist = (origin - part.Position).Magnitude
-                if worldDist <= Config.Aimbot.MaxDist then
-                    local sp, on = Camera:WorldToViewportPoint(part.Position)
-                    if on and sp.Z > 0 then
-                        local screenDist = (Vector2.new(sp.X, sp.Y) - center).Magnitude
-                        if screenDist <= Config.Aimbot.FOV then
-                            local score = screenDist + (worldDist / 50)
-                            if score < bestScore then
-                                bestScore = score
-                                best = part
-                            end
+            local worldDist = (origin - part.Position).Magnitude
+            if worldDist <= Config.Aimbot.MaxDist then
+                local sp, on = Camera:WorldToViewportPoint(part.Position)
+                if on and sp.Z > 0 then
+                    local screenDist = (Vector2.new(sp.X, sp.Y) - center).Magnitude
+                    if screenDist <= Config.Aimbot.FOV then
+                        local score = screenDist + (worldDist / 50)
+                        if score < bestScore then
+                            bestScore = score
+                            best = part
                         end
                     end
                 end
@@ -742,6 +759,7 @@ end
 
 RunService:BindToRenderStep("OmarHubAimbot", Enum.RenderPriority.Camera.Value + 1, aimStep)
 
+-- Restore autorotate when aimbot is off
 track(RunService.Stepped:Connect(function()
     if Config.Aimbot.Enabled then return end
     local char = LocalPlayer.Character
@@ -749,144 +767,16 @@ track(RunService.Stepped:Connect(function()
     if hum and not hum.AutoRotate then hum.AutoRotate = true end
 end))
 
--- ============ SILENT AIM (installed LAST, wrapped in pcall) ============
-local originalRaycast, originalRaycastAll
-local silentFiring = false
-local silentTapUntil = 0
-
-track(UserInputService.InputBegan:Connect(function(input, gp)
-    if gp then return end
-    if input.UserInputType == Enum.UserInputType.MouseButton1
-    or input.UserInputType == Enum.UserInputType.Touch then
-        silentFiring = true
-        silentTapUntil = tick() + 0.2
-    end
-end))
-track(UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1
-    or input.UserInputType == Enum.UserInputType.Touch then
-        silentFiring = false
-    end
-end))
-
-local function isFiringNow()
-    return silentFiring or tick() < silentTapUntil
-end
-
-local function findSilentTarget()
-    local vp = Camera.ViewportSize
-    local center = Vector2.new(vp.X / 2, vp.Y / 2)
-    local origin = Camera.CFrame.Position
-    local best, bestScore = nil, math.huge
-
-    for _, char in ipairs(getCharTargets(Config.SilentAim.TeamCheck)) do
-        local part = pickPart(char, Config.SilentAim.TargetPart)
-        if part and hasLineOfSight(part) then
-            local sp, on = Camera:WorldToViewportPoint(part.Position)
-            if on and sp.Z > 0 then
-                local worldDist = (origin - part.Position).Magnitude
-                local screenDist = (Vector2.new(sp.X, sp.Y) - center).Magnitude
-                if screenDist <= Config.SilentAim.FOV then
-                    local score = screenDist + (worldDist / 50)
-                    if score < bestScore then
-                        bestScore = score
-                        best = part
-                    end
-                end
-            end
-        end
-    end
-    return best
-end
-
-pcall(function()
-    originalRaycast    = Workspace.Raycast
-    originalRaycastAll = Workspace.RaycastAll
-
-    Workspace.Raycast = function(self, origin, direction, params)
-        if self == Workspace and Config.SilentAim.Enabled and isFiringNow() then
-            local ok, result = pcall(function()
-                if Config.SilentAim.HitChance <= 0 then return nil end
-                if Config.SilentAim.HitChance < 100 and math.random(1, 100) > Config.SilentAim.HitChance then
-                    return nil
-                end
-                if (origin - Camera.CFrame.Position).Magnitude > 30 then return nil end
-                if direction.Magnitude > 0.001 and direction.Unit:Dot(Camera.CFrame.LookVector) < 0.1 then
-                    return nil
-                end
-                local target = findSilentTarget()
-                if not target then return nil end
-                return target.Position - origin
-            end)
-            if ok and result then
-                return originalRaycast(self, origin, result, params)
-            end
-        end
-        return originalRaycast(self, origin, direction, params)
-    end
-
-    Workspace.RaycastAll = function(self, origin, direction, params)
-        if self == Workspace and Config.SilentAim.Enabled and isFiringNow() then
-            local ok, result = pcall(function()
-                if Config.SilentAim.HitChance <= 0 then return nil end
-                local target = findSilentTarget()
-                if not target then return nil end
-                return target.Position - origin
-            end)
-            if ok and result then
-                return originalRaycastAll(self, origin, result, params)
-            end
-        end
-        return originalRaycastAll(self, origin, direction, params)
-    end
-end)
-
 -- ============ TOGGLE / CLOSE ============
 local function setUIVisible(vis)
     Main.Visible = vis
     FloatPill.Visible = not vis
+    AimPill.Visible = not vis
 end
 
 track(ToggleBtn.MouseButton1Click:Connect(function()
     setUIVisible(false)
 end))
-
--- OMAR pill drag + tap
-do
-    local dragging, moved, dragStart, startPos = false, false, nil, nil
-    local function clamp(pos)
-        local vp = Camera.ViewportSize
-        local size = FloatPill.AbsoluteSize
-        local w = size.X > 0 and size.X or FloatPill.Size.X.Offset
-        local h = size.Y > 0 and size.Y or FloatPill.Size.Y.Offset
-        return UDim2.new(0, math.clamp(pos.X.Offset, 0, vp.X - w),
-                         0, math.clamp(pos.Y.Offset, 0, vp.Y - h))
-    end
-    track(FloatPill.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1
-        or input.UserInputType == Enum.UserInputType.Touch then
-            dragging, moved, dragStart, startPos = true, false, input.Position, FloatPill.Position
-        end
-    end))
-    track(UserInputService.InputChanged:Connect(function(input)
-        if not dragging then return end
-        if input.UserInputType == Enum.UserInputType.MouseMovement
-        or input.UserInputType == Enum.UserInputType.Touch then
-            local d = input.Position - dragStart
-            if math.abs(d.X) > 3 or math.abs(d.Y) > 3 then moved = true end
-            FloatPill.Position = clamp(UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X,
-                                                 startPos.Y.Scale, startPos.Y.Offset + d.Y))
-        end
-    end))
-    track(UserInputService.InputEnded:Connect(function(input)
-        if not dragging then return end
-        if input.UserInputType == Enum.UserInputType.MouseButton1
-        or input.UserInputType == Enum.UserInputType.Touch then
-            if not moved then setUIVisible(true) end
-            dragging, moved = false, false
-        end
-    end))
-end
 
 track(UserInputService.InputBegan:Connect(function(input, gp)
     if gp then return end
@@ -897,12 +787,6 @@ end))
 
 local function shutdown()
     pcall(function() RunService:UnbindFromRenderStep("OmarHubAimbot") end)
-    if originalRaycast then
-        pcall(function() Workspace.Raycast = originalRaycast end)
-    end
-    if originalRaycastAll then
-        pcall(function() Workspace.RaycastAll = originalRaycastAll end)
-    end
     local char = LocalPlayer.Character
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     if hum then hum.AutoRotate = true end
