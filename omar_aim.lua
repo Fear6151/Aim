@@ -1,7 +1,6 @@
 --[[
-    Omar Hub
+    Omar Hub v25
     Credit: Made by Omar
-    
 --]]
 
 local Players          = game:GetService("Players")
@@ -28,9 +27,12 @@ local Config = {
     ToggleKey = Enum.KeyCode.RightShift,
 }
 
+-- ============ STATE ============
 local connections = {}
 local function track(c) table.insert(connections, c); return c end
 local uiInputCooldown = 0
+local lastGestureTick = 0
+local mouseHeld = false
 
 -- ============ UI ============
 local ScreenGui = Instance.new("ScreenGui")
@@ -143,7 +145,8 @@ local function makeDraggable(button, onTap)
         or input.UserInputType == Enum.UserInputType.Touch then
             if not moved and onTap then
                 local now = tick()
-                if now - uiInputCooldown > 0.15 then
+                if now - lastGestureTick >= 0.25 then
+                    lastGestureTick = now
                     uiInputCooldown = now
                     onTap()
                 end
@@ -155,7 +158,7 @@ end
 
 local FloatPill = Instance.new("TextButton")
 FloatPill.Size = UDim2.new(0, 72, 0, 28)
-FloatPill.Position = UDim2.new(0, 14, 0, 90)
+FloatPill.Position = UDim2.new(0, 14, 1, -80)
 FloatPill.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 FloatPill.Text = "OMAR"
 FloatPill.TextColor3 = Color3.fromRGB(180, 100, 240)
@@ -172,15 +175,9 @@ local PillStroke = Instance.new("UIStroke", FloatPill)
 PillStroke.Color = Color3.fromRGB(150, 70, 220)
 PillStroke.Thickness = 1.5
 
-makeDraggable(FloatPill, function()
-    Main.Visible = true
-    FloatPill.Visible = false
-    AimPill.Visible = false
-end)
-
 local AimPill = Instance.new("TextButton")
 AimPill.Size = UDim2.new(0, 72, 0, 28)
-AimPill.Position = UDim2.new(0, 14, 0, 124)
+AimPill.Position = UDim2.new(0, 14, 1, -46)
 AimPill.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 AimPill.Text = "AIM: OFF"
 AimPill.TextColor3 = Color3.fromRGB(200, 90, 120)
@@ -210,7 +207,15 @@ local function refreshAimPill()
 end
 refreshAimPill()
 
+makeDraggable(FloatPill, function()
+    if not FloatPill.Visible then return end
+    Main.Visible = true
+    FloatPill.Visible = false
+    AimPill.Visible = false
+end)
+
 makeDraggable(AimPill, function()
+    if not AimPill.Visible then return end
     Config.Aimbot.Enabled = not Config.Aimbot.Enabled
     refreshAimPill()
 end)
@@ -463,7 +468,7 @@ local function makeSlider(parent, text, yPos, min, max, default, callback)
     return Frame
 end
 
--- Aimbot page
+-- ============ PAGES ============
 local ay = 4
 makeToggle(AimPage, "Aimbot Enabled", ay, Config.Aimbot.Enabled, function(v)
     Config.Aimbot.Enabled = v; refreshAimPill()
@@ -476,7 +481,6 @@ makeSlider(AimPage, "Aimbot FOV", ay, 30, 500, Config.Aimbot.FOV, function(v) Co
 makeSlider(AimPage, "Smoothness", ay, 1, 100, Config.Aimbot.Smoothness, function(v) Config.Aimbot.Smoothness = v end); ay = ay + 48
 AimPage.CanvasSize = UDim2.new(0, 0, 0, ay + 6)
 
--- Silent page
 local sy = 4
 makeToggle(SilentPage, "Silent Aim Enabled", sy, Config.SilentAim.Enabled, function(v) Config.SilentAim.Enabled = v end); sy = sy + 36
 makeSwitch(SilentPage, "Target:", sy, {"Head", "Torso"}, Config.SilentAim.TargetPart, function(v) Config.SilentAim.TargetPart = v end); sy = sy + 36
@@ -485,7 +489,6 @@ makeSlider(SilentPage, "Silent FOV", sy, 30, 500, Config.SilentAim.FOV, function
 makeSlider(SilentPage, "Hit Chance %", sy, 0, 100, Config.SilentAim.HitChance, function(v) Config.SilentAim.HitChance = v end); sy = sy + 48
 SilentPage.CanvasSize = UDim2.new(0, 0, 0, sy + 6)
 
--- ESP page
 local ey = 4
 makeToggle(EspPage, "ESP Enabled", ey, Config.ESP.Enabled, function(v) Config.ESP.Enabled = v end); ey = ey + 36
 makeToggle(EspPage, "Show Name", ey, Config.ESP.ShowName, function(v) Config.ESP.ShowName = v end); ey = ey + 36
@@ -504,33 +507,42 @@ Credit.TextColor3 = Color3.fromRGB(180, 100, 240)
 Credit.Font = Enum.Font.GothamBold; Credit.TextSize = 12
 Credit.Parent = Main
 
--- FOV rings
+-- ============ FOV RINGS ============
 local FovRing = Instance.new("Frame")
 FovRing.AnchorPoint = Vector2.new(0.5, 0.5)
-FovRing.BackgroundTransparency = 1; FovRing.BorderSizePixel = 0
-FovRing.ZIndex = 1; FovRing.Visible = false; FovRing.Parent = ScreenGui
+FovRing.BackgroundTransparency = 1
+FovRing.BorderSizePixel = 0
+FovRing.ZIndex = 3
+FovRing.Visible = false
+FovRing.Parent = ScreenGui
 Instance.new("UICorner", FovRing).CornerRadius = UDim.new(1, 0)
 local FovStrokeOuter = Instance.new("UIStroke", FovRing)
 FovStrokeOuter.Color = Color3.fromRGB(190, 110, 255)
-FovStrokeOuter.Thickness = 2.5; FovStrokeOuter.Transparency = 0.1
+FovStrokeOuter.Thickness = 2.5
+FovStrokeOuter.Transparency = 0.1
 
 local FovGlow = Instance.new("Frame")
 FovGlow.AnchorPoint = Vector2.new(0.5, 0.5)
-FovGlow.Position = UDim2.new(0.5, 0, 0.5, 0)
-FovGlow.BackgroundTransparency = 1; FovGlow.BorderSizePixel = 0
-FovGlow.ZIndex = 0; FovGlow.Visible = false; FovGlow.Parent = ScreenGui
+FovGlow.BackgroundTransparency = 1
+FovGlow.BorderSizePixel = 0
+FovGlow.ZIndex = 2
+FovGlow.Visible = false
+FovGlow.Parent = ScreenGui
 Instance.new("UICorner", FovGlow).CornerRadius = UDim.new(1, 0)
 local FovStrokeInner = Instance.new("UIStroke", FovGlow)
 FovStrokeInner.Color = Color3.fromRGB(255, 180, 255)
-FovStrokeInner.Thickness = 1; FovStrokeInner.Transparency = 0.6
+FovStrokeInner.Thickness = 1
+FovStrokeInner.Transparency = 0.6
 
 local CenterDot = Instance.new("Frame")
 CenterDot.Size = UDim2.new(0, 6, 0, 6)
 CenterDot.AnchorPoint = Vector2.new(0.5, 0.5)
 CenterDot.Position = UDim2.new(0.5, 0, 0.5, 0)
 CenterDot.BackgroundColor3 = Color3.fromRGB(220, 140, 255)
-CenterDot.BorderSizePixel = 0; CenterDot.ZIndex = 2
-CenterDot.Visible = false; CenterDot.Parent = ScreenGui
+CenterDot.BorderSizePixel = 0
+CenterDot.ZIndex = 4
+CenterDot.Visible = false
+CenterDot.Parent = ScreenGui
 Instance.new("UICorner", CenterDot).CornerRadius = UDim.new(1, 0)
 local CenterStroke = Instance.new("UIStroke", CenterDot)
 CenterStroke.Color = Color3.fromRGB(90, 40, 140)
@@ -538,12 +550,16 @@ CenterStroke.Thickness = 1
 
 local SilentRing = Instance.new("Frame")
 SilentRing.AnchorPoint = Vector2.new(0.5, 0.5)
-SilentRing.BackgroundTransparency = 1; SilentRing.BorderSizePixel = 0
-SilentRing.ZIndex = 1; SilentRing.Visible = false; SilentRing.Parent = ScreenGui
+SilentRing.BackgroundTransparency = 1
+SilentRing.BorderSizePixel = 0
+SilentRing.ZIndex = 3
+SilentRing.Visible = false
+SilentRing.Parent = ScreenGui
 Instance.new("UICorner", SilentRing).CornerRadius = UDim.new(1, 0)
 local SilentStroke = Instance.new("UIStroke", SilentRing)
 SilentStroke.Color = Color3.fromRGB(120, 220, 255)
-SilentStroke.Thickness = 1.5; SilentStroke.Transparency = 0.25
+SilentStroke.Thickness = 2
+SilentStroke.Transparency = 0.1
 
 local TargetDot = Drawing.new("Circle")
 TargetDot.Thickness = 2; TargetDot.Color = Color3.fromRGB(255, 80, 255)
@@ -566,7 +582,9 @@ local function isTeammate(player, teamCheckOn)
     return a == b
 end
 
-local function isAliveHumanoid(hum) return hum and hum.Health > 0 end
+local function isAliveHumanoid(hum)
+    return hum and hum.Health > 0
+end
 
 local function hasValidRig(model)
     if not model or not model.Parent then return false end
@@ -627,7 +645,7 @@ local function refreshNpcCache()
 end
 
 local function collectAll(teamCheckOn)
-    local players = {}
+    local playersList = {}
     for _, p in ipairs(Players:GetPlayers()) do
         if p == LocalPlayer then continue end
         local char = p.Character
@@ -636,14 +654,14 @@ local function collectAll(teamCheckOn)
         if not isAliveHumanoid(hum) then continue end
         if isTeammate(p, teamCheckOn) then continue end
         if not hasValidRig(char) then continue end
-        players[#players + 1] = char
+        playersList[#playersList + 1] = char
     end
     refreshNpcCache()
     local npcs = {}
     for _, m in ipairs(npcCache) do
         if m.Parent then npcs[#npcs + 1] = m end
     end
-    return players, npcs
+    return playersList, npcs
 end
 
 -- ============ ESP ============
@@ -657,21 +675,34 @@ local function createESP(character)
         Name = Drawing.new("Text"), Distance = Drawing.new("Text"),
         HP = Drawing.new("Square"), HPBg = Drawing.new("Square"), HPOutline = Drawing.new("Square"),
     }
-    d.Box.Thickness = 1; d.Box.Color = Color3.fromRGB(160, 80, 255); d.Box.Filled = false
-    d.Box.Transparency = 1; d.Box.Visible = false
+    d.Box.Thickness = 1
+    d.Box.Color = Color3.fromRGB(160, 80, 255)
+    d.Box.Filled = false
+    d.Box.Transparency = 1
+    d.Box.Visible = false
     for _, line in ipairs({d.TL, d.TR, d.BL, d.BR}) do
-        line.Thickness = 2; line.Color = Color3.fromRGB(200, 130, 255)
-        line.Transparency = 1; line.Visible = false
+        line.Thickness = 2
+        line.Color = Color3.fromRGB(200, 130, 255)
+        line.Transparency = 1
+        line.Visible = false
     end
-    d.HPBg.Filled = true; d.HPBg.Color = Color3.fromRGB(0, 0, 0)
-    d.HPBg.Transparency = 0.5; d.HPBg.Visible = false
-    d.HPOutline.Filled = false; d.HPOutline.Color = Color3.fromRGB(20, 10, 30)
-    d.HPOutline.Thickness = 1; d.HPOutline.Transparency = 1; d.HPOutline.Visible = false
-    d.HP.Filled = true; d.HP.Color = Color3.fromRGB(0, 255, 0)
-    d.HP.Transparency = 1; d.HP.Visible = false
+    d.HPBg.Filled = true
+    d.HPBg.Color = Color3.fromRGB(0, 0, 0)
+    d.HPBg.Transparency = 0.5
+    d.HPBg.Visible = false
+    d.HPOutline.Filled = false
+    d.HPOutline.Color = Color3.fromRGB(20, 10, 30)
+    d.HPOutline.Thickness = 1
+    d.HPOutline.Transparency = 1
+    d.HPOutline.Visible = false
+    d.HP.Filled = true
+    d.HP.Color = Color3.fromRGB(0, 255, 0)
+    d.HP.Transparency = 1
+    d.HP.Visible = false
     for _, t in ipairs({d.Name, d.Distance}) do
         t.Size = 14; t.Center = true; t.Outline = true
-        t.OutlineColor = Color3.fromRGB(0, 0, 0); t.Color = Color3.fromRGB(255, 255, 255)
+        t.OutlineColor = Color3.fromRGB(0, 0, 0)
+        t.Color = Color3.fromRGB(255, 255, 255)
         t.Font = 2; t.Visible = false
     end
     d.Name.Color = Color3.fromRGB(220, 180, 255)
@@ -685,7 +716,10 @@ local function removeESP(character)
     for _, obj in pairs(d) do pcall(function() obj:Remove() end) end
     espObjects[character] = nil
 end
-local function setAllVisible(d, vis) for _, o in pairs(d) do o.Visible = vis end end
+
+local function setAllVisible(d, vis)
+    for _, o in pairs(d) do o.Visible = vis end
+end
 
 track(Workspace.DescendantRemoving:Connect(function(obj)
     if espObjects[obj] then removeESP(obj) end
@@ -756,7 +790,6 @@ local function drawESP(char, name)
 end
 
 -- ============ MOUSE STATE ============
-local mouseHeld = false
 track(UserInputService.InputBegan:Connect(function(input, gp)
     if gp then return end
     if input.UserInputType == Enum.UserInputType.MouseButton1
@@ -773,14 +806,14 @@ track(UserInputService.InputEnded:Connect(function(input)
     end
 end))
 
--- ============ SILENT AIM TARGET (nearest crosshair, skips walls) ============
+-- ============ SILENT AIM: TARGET ============
 local function findSilentTarget()
     local vp = Camera.ViewportSize
     local center = Vector2.new(vp.X / 2, vp.Y / 2)
     local origin = Camera.CFrame.Position
     local bestPart, bestScore = nil, math.huge
 
-    local players, npcs = collectAll(Config.SilentAim.TeamCheck)
+    local playersList, npcs = collectAll(Config.SilentAim.TeamCheck)
 
     local function test(char)
         local part = pickPart(char, Config.SilentAim.TargetPart)
@@ -799,21 +832,21 @@ local function findSilentTarget()
         end
     end
 
-    for _, char in ipairs(players) do test(char) end
-    for _, char in ipairs(npcs)    do test(char) end
+    for _, char in ipairs(playersList) do test(char) end
+    for _, char in ipairs(npcs)        do test(char) end
     return bestPart
 end
 
--- ============ SILENT AIM RAY HOOKS ============
-local originalRaycast              = Workspace.Raycast
-local originalRaycastAll           = Workspace.RaycastAll
-local originalFindPartOnRay        = Workspace.FindPartOnRay
-local originalFindPartOnRayIgnore  = Workspace.FindPartOnRayWithIgnoreList
+-- ============ SILENT AIM: RAY HOOKS ============
+local originalRaycast             = Workspace.Raycast
+local originalRaycastAll          = Workspace.RaycastAll
+local originalFindPartOnRay       = Workspace.FindPartOnRay
+local originalFindPartOnRayIgnore = Workspace.FindPartOnRayWithIgnoreList
 
-local silentFiring  = false
+local silentFiring   = false
 local silentTapUntil = 0
 
-local function silentTrigger() silentTapUntil = tick() + 0.15 end
+local function silentTrigger() silentTapUntil = tick() + 0.2 end
 
 track(UserInputService.InputBegan:Connect(function(input, gp)
     if gp then return end
@@ -837,9 +870,9 @@ end
 
 local function watchCharacter(char)
     if not char then return end
-    char.ChildAdded:Connect(function(child)
+    track(char.ChildAdded:Connect(function(child)
         if child:IsA("Tool") then bindToolActivated(child) end
-    end)
+    end))
     for _, c in ipairs(char:GetChildren()) do
         if c:IsA("Tool") then bindToolActivated(c) end
     end
@@ -850,13 +883,13 @@ track(LocalPlayer.CharacterAdded:Connect(watchCharacter))
 
 local function isFiringNow() return silentFiring or tick() < silentTapUntil end
 
-local function vectorIsCloseToCameraOrigin(v)
+local function originNearCamera(v)
     return (v - Camera.CFrame.Position).Magnitude < 30
 end
 
-local function directionLooksLikeCamera(dir)
+local function directionPointsForward(dir)
     if not dir or dir.Magnitude < 0.001 then return false end
-    return dir.Unit:Dot(Camera.CFrame.LookVector) > 0.15
+    return dir.Unit:Dot(Camera.CFrame.LookVector) > 0.1
 end
 
 local function filterAllowsTarget(params, targetChar, targetPart)
@@ -873,16 +906,14 @@ local function tryRedirect(origin, direction, params)
     if not Config.SilentAim.Enabled then return nil end
     if not isFiringNow() then return nil end
     if Config.SilentAim.HitChance <= 0 then return nil end
-    if Config.SilentAim.HitChance < 100 then
-        if math.random(1, 100) > Config.SilentAim.HitChance then return nil end
+    if Config.SilentAim.HitChance < 100 and math.random(1, 100) > Config.SilentAim.HitChance then
+        return nil
     end
-    if not vectorIsCloseToCameraOrigin(origin) then return nil end
-    if not directionLooksLikeCamera(direction) then return nil end
-
+    if not originNearCamera(origin) then return nil end
+    if not directionPointsForward(direction) then return nil end
     local target = findSilentTarget()
     if not target then return nil end
     if not filterAllowsTarget(params, target.Parent, target) then return nil end
-
     return (target.Position - origin), target
 end
 
@@ -905,8 +936,8 @@ end
 Workspace.FindPartOnRay = function(self, ray, ignore, cells, water)
     if self == Workspace and ray then
         if Config.SilentAim.Enabled and isFiringNow()
-        and vectorIsCloseToCameraOrigin(ray.Origin)
-        and directionLooksLikeCamera(ray.Direction) then
+        and originNearCamera(ray.Origin)
+        and directionPointsForward(ray.Direction) then
             local target = findSilentTarget()
             if target then
                 local newRay = Ray.new(ray.Origin, target.Position - ray.Origin)
@@ -920,8 +951,8 @@ end
 Workspace.FindPartOnRayWithIgnoreList = function(self, ray, ignoreList, cells, water)
     if self == Workspace and ray then
         if Config.SilentAim.Enabled and isFiringNow()
-        and vectorIsCloseToCameraOrigin(ray.Origin)
-        and directionLooksLikeCamera(ray.Direction) then
+        and originNearCamera(ray.Origin)
+        and directionPointsForward(ray.Direction) then
             local target = findSilentTarget()
             if target then
                 local blocked = false
@@ -942,7 +973,7 @@ Workspace.FindPartOnRayWithIgnoreList = function(self, ray, ignoreList, cells, w
     return originalFindPartOnRayIgnore(self, ray, ignoreList, cells, water)
 end
 
--- Mouse.Hit / Mouse.UnitRay metatable hook
+-- Mouse.Hit / Mouse.UnitRay hook
 do
     local Mouse = LocalPlayer:GetMouse()
     if Mouse then
@@ -950,8 +981,8 @@ do
         if mt and not mt.__silent_hooked then
             local originalIndex = mt.__index
             mt.__index = function(tbl, key)
-                if (key == "Hit" or key == "UnitRay") and
-                   Config.SilentAim.Enabled and isFiringNow() then
+                if (key == "Hit" or key == "UnitRay")
+                and Config.SilentAim.Enabled and isFiringNow() then
                     local target = findSilentTarget()
                     if target then
                         local origin = Camera.CFrame.Position
@@ -988,9 +1019,9 @@ local function findAimbotTarget()
         return worldDist + (screenDist / 10)
     end
 
-    local players, npcs = collectAll(Config.Aimbot.TeamCheck)
+    local playersList, npcs = collectAll(Config.Aimbot.TeamCheck)
     local best, bestScore = nil, math.huge
-    for _, char in ipairs(players) do
+    for _, char in ipairs(playersList) do
         local part = pickPart(char, Config.Aimbot.TargetPart)
         if part then
             local s = scoreFor(part)
@@ -1008,8 +1039,6 @@ local function findAimbotTarget()
     return best
 end
 
-local AIMBOT_BIND_NAME = "OmarHubAimbot"
-local bound = false
 local currentTarget = nil
 local currentTargetScore = math.huge
 local targetStickTime = 0
@@ -1037,6 +1066,7 @@ local function scorePart(part)
 end
 
 local function aimStep()
+    -- FOV ring
     if Config.Aimbot.Enabled then
         local r = Config.Aimbot.FOV
         FovRing.Size = UDim2.new(0, r * 2, 0, r * 2)
@@ -1051,19 +1081,12 @@ local function aimStep()
         TargetDot.Visible = false; TargetDotInner.Visible = false
     end
 
+    -- Silent ring (own independent updater below, but keep in sync here)
     if Config.SilentAim.Enabled then
         local r = Config.SilentAim.FOV
         SilentRing.Size = UDim2.new(0, r * 2, 0, r * 2)
         SilentRing.Position = UDim2.new(0.5, 0, 0.5, 0)
         SilentRing.Visible = true
-        local st = findSilentTarget()
-        if st then
-            local sp, on = Camera:WorldToViewportPoint(st.Position)
-            if on and sp.Z > 0 then
-                SilentDot.Visible = true
-                SilentDot.Position = Vector2.new(sp.X, sp.Y)
-            else SilentDot.Visible = false end
-        else SilentDot.Visible = false end
     else
         SilentRing.Visible = false
         SilentDot.Visible = false
@@ -1129,15 +1152,31 @@ local function aimStep()
     end
 end
 
--- Single UI + aimbot step bind
-RunService:BindToRenderStep("OmarHubUI", Enum.RenderPriority.Camera.Value + 1, aimStep)
-bound = true
+RunService:BindToRenderStep("OmarHubAimbot", Enum.RenderPriority.Camera.Value + 1, aimStep)
 
-track(LocalPlayer.CharacterAdded:Connect(function()
-    task.wait(0.2)
-    if not Config.Aimbot.Enabled then
-        local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-        if hum then hum.AutoRotate = true end
+-- ============ SILENT UI UPDATER (independent of Aimbot state) ============
+track(RunService.RenderStepped:Connect(function()
+    if Config.SilentAim.Enabled then
+        local r = Config.SilentAim.FOV
+        SilentRing.Size = UDim2.new(0, r * 2, 0, r * 2)
+        SilentRing.Position = UDim2.new(0.5, 0, 0.5, 0)
+        SilentRing.Visible = true
+
+        local st = findSilentTarget()
+        if st then
+            local sp, on = Camera:WorldToViewportPoint(st.Position)
+            if on and sp.Z > 0 then
+                SilentDot.Visible = true
+                SilentDot.Position = Vector2.new(sp.X, sp.Y)
+            else
+                SilentDot.Visible = false
+            end
+        else
+            SilentDot.Visible = false
+        end
+    else
+        SilentRing.Visible = false
+        SilentDot.Visible = false
     end
 end))
 
@@ -1147,9 +1186,9 @@ track(RunService.RenderStepped:Connect(function()
         for _, d in pairs(espObjects) do setAllVisible(d, false) end
         return
     end
-    local players, npcs = collectAll(Config.ESP.TeamCheck)
+    local playersList, npcs = collectAll(Config.ESP.TeamCheck)
     local liveChars = {}
-    for _, char in ipairs(players) do
+    for _, char in ipairs(playersList) do
         local plr = Players:GetPlayerFromCharacter(char)
         local name = plr and ((plr.DisplayName ~= "" and plr.DisplayName) or plr.Name) or char.Name
         liveChars[char] = true
@@ -1164,6 +1203,14 @@ track(RunService.RenderStepped:Connect(function()
     end
 end))
 
+-- Restore auto-rotate when aimbot is off
+track(RunService.Stepped:Connect(function()
+    if Config.Aimbot.Enabled then return end
+    local char = LocalPlayer.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if hum and not hum.AutoRotate then hum.AutoRotate = true end
+end))
+
 -- ============ TOGGLE / CLOSE ============
 local function setUIVisible(vis)
     Main.Visible = vis
@@ -1173,12 +1220,15 @@ end
 
 local function hidePanel()
     local now = tick()
-    if now - uiInputCooldown < 0.15 then return end
+    if now - lastGestureTick < 0.25 then return end
+    lastGestureTick = now
     uiInputCooldown = now
     setUIVisible(false)
 end
 
-local function showPanel() setUIVisible(true) end
+local function showPanel()
+    setUIVisible(true)
+end
 
 track(ToggleBtn.MouseButton1Click:Connect(hidePanel))
 
@@ -1191,12 +1241,11 @@ end))
 
 -- ============ SHUTDOWN ============
 local function shutdown()
-    pcall(function() RunService:UnbindFromRenderStep("OmarHubUI") end)
+    pcall(function() RunService:UnbindFromRenderStep("OmarHubAimbot") end)
     pcall(function() Workspace.Raycast = originalRaycast end)
     pcall(function() Workspace.RaycastAll = originalRaycastAll end)
     pcall(function() Workspace.FindPartOnRay = originalFindPartOnRay end)
     pcall(function() Workspace.FindPartOnRayWithIgnoreList = originalFindPartOnRayIgnore end)
-    bound = false
     local char = LocalPlayer.Character
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     if hum then hum.AutoRotate = true end
