@@ -1,7 +1,7 @@
 --[[
-    Omar Hub 
+    Omar Hub v11
     Credit: Made by Omar
-
+    For use ONLY in your own Roblox game.
 --]]
 
 local Players          = game:GetService("Players")
@@ -20,15 +20,16 @@ local Config = {
         ShowHealth   = true,
         ShowBox      = true,
         TeamCheck    = true,
-        MaxBoxPixels = 1200, -- safety clamp: if box is bigger than this, skip frame
+        MaxBoxPixels = 1200,
     },
     Aimbot = {
-        Enabled     = false,
-        FOV         = 150,
-        TargetPart  = "Head",
-        TeamCheck   = true,
-        MaxDist     = 1000,
-        LockPower   = 100,
+        Enabled    = false,
+        FOV        = 150,
+        TargetPart = "Head",       -- "Head" or "Torso"
+        TeamCheck  = true,
+        MaxDist    = 1000,
+        Smoothness = 100,          -- 1 = soft, 100 = instant hard lock
+        LockMode   = "Hold Mouse", -- "Hold Mouse" | "Always"
     },
     ToggleKey = Enum.KeyCode.RightShift,
 }
@@ -43,6 +44,7 @@ ScreenGui.Name = "OmarHub"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.IgnoreGuiInset = true
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.DisplayOrder = 999
 ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local Main = Instance.new("Frame")
@@ -116,16 +118,17 @@ Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
 
 -- Floating reopen button
 local FloatBtn = Instance.new("TextButton")
-FloatBtn.Size = UDim2.new(0, 42, 0, 42)
+FloatBtn.Size = UDim2.new(0, 46, 0, 46)
 FloatBtn.Position = UDim2.new(0, 20, 0, 20)
 FloatBtn.BackgroundColor3 = Color3.fromRGB(90, 40, 140)
 FloatBtn.Text = "O"
 FloatBtn.TextColor3 = Color3.fromRGB(240, 210, 255)
 FloatBtn.Font = Enum.Font.GothamBold
-FloatBtn.TextSize = 18
+FloatBtn.TextSize = 20
 FloatBtn.BorderSizePixel = 0
-FloatBtn.Active = true
-FloatBtn.Draggable = true
+FloatBtn.Active = false
+FloatBtn.Draggable = false
+FloatBtn.ZIndex = 500
 FloatBtn.Visible = false
 FloatBtn.Parent = ScreenGui
 Instance.new("UICorner", FloatBtn).CornerRadius = UDim.new(1, 0)
@@ -213,7 +216,7 @@ AimPage.BackgroundTransparency = 1
 AimPage.BorderSizePixel = 0
 AimPage.ScrollBarThickness = 3
 AimPage.ScrollBarImageColor3 = Color3.fromRGB(140, 60, 220)
-AimPage.CanvasSize = UDim2.new(0, 0, 0, 220)
+AimPage.CanvasSize = UDim2.new(0, 0, 0, 300)
 AimPage.Visible = false
 AimPage.Parent = Body
 
@@ -403,9 +406,10 @@ EspPage.CanvasSize = UDim2.new(0, 0, 0, ey + 6)
 local ay = 4
 makeToggle(AimPage, "Aimbot Enabled", ay, Config.Aimbot.Enabled, function(v) Config.Aimbot.Enabled = v end); ay = ay + 36
 makeSwitch(AimPage, "Target:", ay, {"Head", "Torso"}, Config.Aimbot.TargetPart, function(v) Config.Aimbot.TargetPart = v end); ay = ay + 36
+makeSwitch(AimPage, "Lock Mode:", ay, {"Hold Mouse", "Always"}, Config.Aimbot.LockMode, function(v) Config.Aimbot.LockMode = v end); ay = ay + 36
 makeToggle(AimPage, "Team Check", ay, Config.Aimbot.TeamCheck, function(v) Config.Aimbot.TeamCheck = v end); ay = ay + 36
 makeSlider(AimPage, "FOV", ay, 30, 500, Config.Aimbot.FOV, function(v) Config.Aimbot.FOV = v end); ay = ay + 48
-makeSlider(AimPage, "Lock Power (1=soft, 100=hard)", ay, 1, 100, Config.Aimbot.LockPower, function(v) Config.Aimbot.LockPower = v end); ay = ay + 48
+makeSlider(AimPage, "Smoothness (1 soft - 100 hard)", ay, 1, 100, Config.Aimbot.Smoothness, function(v) Config.Aimbot.Smoothness = v end); ay = ay + 48
 AimPage.CanvasSize = UDim2.new(0, 0, 0, ay + 6)
 
 local Credit = Instance.new("TextLabel")
@@ -432,6 +436,23 @@ FovStroke.Color = Color3.fromRGB(180, 100, 255)
 FovStroke.Thickness = 1.5
 FovStroke.Transparency = 0.3
 
+-- Target highlight dot (drawn on top of the target part)
+local TargetDot = Drawing.new("Circle")
+TargetDot.Thickness = 2
+TargetDot.Color = Color3.fromRGB(255, 80, 255)
+TargetDot.Filled = false
+TargetDot.Radius = 10
+TargetDot.Transparency = 1
+TargetDot.Visible = false
+
+local TargetDotInner = Drawing.new("Circle")
+TargetDotInner.Thickness = 1
+TargetDotInner.Color = Color3.fromRGB(255, 200, 255)
+TargetDotInner.Filled = false
+TargetDotInner.Radius = 4
+TargetDotInner.Transparency = 1
+TargetDotInner.Visible = false
+
 -- ============ HELPERS ============
 local function isTeammate(player)
     if player == LocalPlayer then return false end
@@ -451,7 +472,6 @@ local function hasValidRig(model)
     return head and head:IsA("BasePart") and hrp and hrp:IsA("BasePart")
 end
 
--- Strict part picker (reads fresh)
 local function getTargetPart(char)
     if not hasValidRig(char) then return nil end
     if Config.Aimbot.TargetPart == "Head" then
@@ -467,7 +487,6 @@ local function getTargetPart(char)
 end
 
 -- ============ TARGET COLLECTION ============
--- Real players only (lightweight, fast)
 local function getPlayerTargets()
     local out = {}
     for _, player in ipairs(Players:GetPlayers()) do
@@ -489,7 +508,6 @@ local function getPlayerTargets()
     return out
 end
 
--- NPC / bot targets — cached every 0.5s, filtered hard
 local npcCache = {}
 local npcCacheTime = 0
 
@@ -508,7 +526,6 @@ local function refreshNpcCache()
         if model == localChar then continue end
         if Players:GetPlayerFromCharacter(model) then continue end
         if not hasValidRig(model) then continue end
-        -- sanity: HRP must be within a reasonable distance from head
         local head = model:FindFirstChild("Head")
         local hrp  = model:FindFirstChild("HumanoidRootPart")
         if (head.Position - hrp.Position).Magnitude > 8 then continue end
@@ -633,12 +650,10 @@ local function drawESP(t)
     local height = math.abs(rootPos.Y - headPos.Y)
     local width = height * 0.6
 
-    -- SAFETY CLAMP: skip drawing if box is insane (bad rig, glitched NPC, etc.)
     if height > Config.ESP.MaxBoxPixels or width > Config.ESP.MaxBoxPixels then
         setAllVisible(d, false); return
     end
-    -- Also clamp to viewport so nothing shoots off screen
-    if not (height > 0 and width > 0 and height < 1e6 and width < 1e6) then
+    if not (height > 0 and width > 0) then
         setAllVisible(d, false); return
     end
 
@@ -702,41 +717,26 @@ local function drawESP(t)
     end
 end
 
--- ============ ESP RENDER ============
-track(RunService.RenderStepped:Connect(function()
-    if Config.Aimbot.Enabled and Main.Visible then
-        FovCircle.Visible = true
-        FovCircle.Size = UDim2.new(0, Config.Aimbot.FOV * 2, 0, Config.Aimbot.FOV * 2)
-        FovCircle.Position = UDim2.new(0.5, 0, 0.5, 0)
-    else
-        FovCircle.Visible = false
-    end
+-- ============ MOUSE STATE (for hold-to-lock) ============
+local mouseHeld = false
 
-    if not Config.ESP.Enabled then
-        for _, d in pairs(espObjects) do setAllVisible(d, false) end
-        return
+track(UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+    or input.UserInputType == Enum.UserInputType.MouseButton2
+    or input.UserInputType == Enum.UserInputType.Touch then
+        mouseHeld = true
     end
-
-    local liveChars = {}
-    local playerTargets = getPlayerTargets()
-    for _, t in ipairs(playerTargets) do
-        liveChars[t.character] = true
-        drawESP(t)
-    end
-
-    local npcTargets = getNpcTargets()
-    for _, t in ipairs(npcTargets) do
-        liveChars[t.character] = true
-        drawESP(t)
-    end
-
-    for char, d in pairs(espObjects) do
-        if not liveChars[char] then setAllVisible(d, false) end
+end))
+track(UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+    or input.UserInputType == Enum.UserInputType.MouseButton2
+    or input.UserInputType == Enum.UserInputType.Touch then
+        mouseHeld = false
     end
 end))
 
 -- ============ AIMBOT ============
--- Re-acquire every frame; prefer players, fall back to NPCs
 local function findBestTarget()
     local vp = Camera.ViewportSize
     local center = Vector2.new(vp.X / 2, vp.Y / 2)
@@ -745,7 +745,6 @@ local function findBestTarget()
     local bestPlayer, bestPlayerDist = nil, math.huge
     local bestNpc,    bestNpcDist    = nil, math.huge
 
-    -- 1) Players
     for _, t in ipairs(getPlayerTargets()) do
         local part = getTargetPart(t.character)
         if part then
@@ -753,9 +752,9 @@ local function findBestTarget()
             if dist <= Config.Aimbot.MaxDist then
                 local sp, on = Camera:WorldToViewportPoint(part.Position)
                 if on and sp.Z > 0 then
-                    local screenDist = (Vector2.new(sp.X, sp.Y) - center).Magnitude
-                    if screenDist <= Config.Aimbot.FOV and screenDist < bestPlayerDist then
-                        bestPlayerDist = screenDist
+                    local sd = (Vector2.new(sp.X, sp.Y) - center).Magnitude
+                    if sd <= Config.Aimbot.FOV and sd < bestPlayerDist then
+                        bestPlayerDist = sd
                         bestPlayer = part
                     end
                 end
@@ -765,7 +764,6 @@ local function findBestTarget()
 
     if bestPlayer then return bestPlayer end
 
-    -- 2) NPCs (only if no player found)
     for _, t in ipairs(getNpcTargets()) do
         local part = getTargetPart(t.character)
         if part then
@@ -773,16 +771,15 @@ local function findBestTarget()
             if dist <= Config.Aimbot.MaxDist then
                 local sp, on = Camera:WorldToViewportPoint(part.Position)
                 if on and sp.Z > 0 then
-                    local screenDist = (Vector2.new(sp.X, sp.Y) - center).Magnitude
-                    if screenDist <= Config.Aimbot.FOV and screenDist < bestNpcDist then
-                        bestNpcDist = screenDist
+                    local sd = (Vector2.new(sp.X, sp.Y) - center).Magnitude
+                    if sd <= Config.Aimbot.FOV and sd < bestNpcDist then
+                        bestNpcDist = sd
                         bestNpc = part
                     end
                 end
             end
         end
     end
-
     return bestNpc
 end
 
@@ -800,13 +797,42 @@ local function targetIsValid(part)
 end
 
 local function aimStep()
-    if not Config.Aimbot.Enabled then return end
+    if not Config.Aimbot.Enabled then
+        TargetDot.Visible = false
+        TargetDotInner.Visible = false
+        return
+    end
 
-    -- Validate cached target; drop immediately if stale
+    -- Hold-to-lock gate
+    if Config.Aimbot.LockMode == "Hold Mouse" and not mouseHeld then
+        -- Still show target dot while player is inside FOV so user knows who's next
+        local peek = currentTarget
+        if not targetIsValid(peek) then
+            peek = findBestTarget()
+            currentTarget = peek
+        end
+        if peek then
+            local sp, on = Camera:WorldToViewportPoint(peek.Position)
+            if on and sp.Z > 0 then
+                TargetDot.Visible = true
+                TargetDot.Position = Vector2.new(sp.X, sp.Y)
+                TargetDotInner.Visible = true
+                TargetDotInner.Position = Vector2.new(sp.X, sp.Y)
+            else
+                TargetDot.Visible = false
+                TargetDotInner.Visible = false
+            end
+        else
+            TargetDot.Visible = false
+            TargetDotInner.Visible = false
+        end
+        return
+    end
+
+    -- Validate / re-acquire
     if not targetIsValid(currentTarget) then
         currentTarget = nil
     end
-    -- Also drop if target left FOV
     if currentTarget then
         local sp, on = Camera:WorldToViewportPoint(currentTarget.Position)
         local vp = Camera.ViewportSize
@@ -815,14 +841,30 @@ local function aimStep()
             currentTarget = nil
         end
     end
-
     if not currentTarget then
         currentTarget = findBestTarget()
     end
-    if not currentTarget then return end
+
+    if not currentTarget then
+        TargetDot.Visible = false
+        TargetDotInner.Visible = false
+        return
+    end
+
+    -- Draw the target indicator
+    local sp, on = Camera:WorldToViewportPoint(currentTarget.Position)
+    if on and sp.Z > 0 then
+        TargetDot.Visible = true
+        TargetDot.Position = Vector2.new(sp.X, sp.Y)
+        TargetDotInner.Visible = true
+        TargetDotInner.Position = Vector2.new(sp.X, sp.Y)
+    else
+        TargetDot.Visible = false
+        TargetDotInner.Visible = false
+    end
 
     local aimPos = currentTarget.Position
-    local alpha = math.clamp(Config.Aimbot.LockPower / 100, 0.01, 1)
+    local alpha = math.clamp(Config.Aimbot.Smoothness / 100, 0.01, 1)
 
     -- Camera lock
     local curCF = Camera.CFrame
@@ -852,6 +894,8 @@ local function refreshBinding()
         end
     else
         currentTarget = nil
+        TargetDot.Visible = false
+        TargetDotInner.Visible = false
         if bound then
             pcall(function() RunService:UnbindFromRenderStep(AIMBOT_BIND_NAME) end)
             bound = false
@@ -870,7 +914,6 @@ track(RunService.Heartbeat:Connect(function()
     end
 end))
 
--- Ensure AutoRotate is restored when aimbot off
 track(RunService.Stepped:Connect(function()
     if Config.Aimbot.Enabled then return end
     local char = LocalPlayer.Character
@@ -887,6 +930,35 @@ track(LocalPlayer.CharacterAdded:Connect(function()
 end))
 
 refreshBinding()
+
+-- ============ ESP RENDER ============
+track(RunService.RenderStepped:Connect(function()
+    if Config.Aimbot.Enabled and Main.Visible then
+        FovCircle.Visible = true
+        FovCircle.Size = UDim2.new(0, Config.Aimbot.FOV * 2, 0, Config.Aimbot.FOV * 2)
+        FovCircle.Position = UDim2.new(0.5, 0, 0.5, 0)
+    else
+        FovCircle.Visible = false
+    end
+
+    if not Config.ESP.Enabled then
+        for _, d in pairs(espObjects) do setAllVisible(d, false) end
+        return
+    end
+
+    local liveChars = {}
+    for _, t in ipairs(getPlayerTargets()) do
+        liveChars[t.character] = true
+        drawESP(t)
+    end
+    for _, t in ipairs(getNpcTargets()) do
+        liveChars[t.character] = true
+        drawESP(t)
+    end
+    for char, d in pairs(espObjects) do
+        if not liveChars[char] then setAllVisible(d, false) end
+    end
+end))
 
 -- ============ TOGGLE / CLOSE ============
 local function setUIVisible(vis)
@@ -924,6 +996,8 @@ local function shutdown()
         end
     end
     espObjects = {}
+    pcall(function() TargetDot:Remove() end)
+    pcall(function() TargetDotInner:Remove() end)
 
     for _, c in ipairs(connections) do
         pcall(function() c:Disconnect() end)
