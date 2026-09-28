@@ -1,7 +1,6 @@
 --[[
-    Omar Hub v27
+    Omar Hub v28 — Diagnostic + Fallback ESP
     Credit: Made by Omar
-    For use ONLY in your own Roblox game.
 --]]
 
 local Players          = game:GetService("Players")
@@ -11,11 +10,14 @@ local Workspace        = game:GetService("Workspace")
 local Camera           = Workspace.CurrentCamera
 local LocalPlayer      = Players.LocalPlayer
 
+local function log(msg) print("[OmarHub] " .. msg) end
+log("Script starting...")
+
 -- ============ CONFIG ============
 local Config = {
     ESP = {
         Enabled = true, ShowName = true, ShowDistance = true,
-        ShowHealth = true, ShowBox = true, TeamCheck = false, MaxBoxPixels = 1200,
+        ShowHealth = true, ShowBox = true, TeamCheck = false,
     },
     Aimbot = {
         Enabled = false, FOV = 150, TargetPart = "Head", TeamCheck = false,
@@ -31,7 +33,17 @@ local Config = {
 local connections = {}
 local function track(c) table.insert(connections, c); return c end
 local mouseHeld = false
-local uiCooldown = 0
+
+-- Detect Drawing availability
+local drawingOK = false
+pcall(function()
+    if Drawing and Drawing.new then
+        local test = Drawing.new("Circle")
+        test:Remove()
+        drawingOK = true
+    end
+end)
+log("Drawing available: " .. tostring(drawingOK))
 
 -- ============ UI ============
 local ScreenGui = Instance.new("ScreenGui")
@@ -40,6 +52,7 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.IgnoreGuiInset = true
 ScreenGui.DisplayOrder = 999
 ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+log("ScreenGui created")
 
 local Main = Instance.new("Frame")
 Main.Size = UDim2.new(0, 260, 0, 360)
@@ -96,13 +109,69 @@ CloseBtn.BorderSizePixel = 0
 CloseBtn.Parent = TitleBar
 Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
 
--- Drag
+-- OMAR pill
+local FloatPill = Instance.new("TextButton")
+FloatPill.Size = UDim2.new(0, 72, 0, 28)
+FloatPill.Position = UDim2.new(0, 14, 1, -80)
+FloatPill.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+FloatPill.Text = "OMAR"
+FloatPill.TextColor3 = Color3.fromRGB(180, 100, 240)
+FloatPill.Font = Enum.Font.GothamBold
+FloatPill.TextSize = 12
+FloatPill.BorderSizePixel = 0
+FloatPill.AutoButtonColor = false
+FloatPill.ZIndex = 500
+FloatPill.Visible = false
+FloatPill.Parent = ScreenGui
+Instance.new("UICorner", FloatPill).CornerRadius = UDim.new(0, 6)
+local PillStroke = Instance.new("UIStroke", FloatPill)
+PillStroke.Color = Color3.fromRGB(150, 70, 220)
+PillStroke.Thickness = 1.5
+
+log("Base UI created")
+
+-- ============ WIRE UP BUTTONS FIRST (before any features) ============
+local function setUIVisible(vis)
+    Main.Visible = vis
+    FloatPill.Visible = not vis
+end
+
+track(ToggleBtn.MouseButton1Click:Connect(function()
+    log("Hide clicked")
+    setUIVisible(false)
+end))
+
+track(CloseBtn.MouseButton1Click:Connect(function()
+    log("Close clicked")
+    -- We'll define full shutdown later, this just hides for now
+    ScreenGui.Enabled = false
+    task.wait(0.1)
+    ScreenGui.Enabled = true
+    -- Full shutdown attaches at the bottom
+end))
+
+track(FloatPill.MouseButton1Click:Connect(function()
+    log("OMAR clicked")
+    setUIVisible(true)
+end))
+
+track(UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.KeyCode == Config.ToggleKey then
+        setUIVisible(not Main.Visible)
+    end
+end))
+
+log("Base buttons wired")
+
+-- Drag main panel
 do
     local dragging, dragStart, startPos = false, nil, nil
     track(TitleBar.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1
         or input.UserInputType == Enum.UserInputType.Touch then
             dragging, dragStart, startPos = true, input.Position, Main.Position
+            log("Drag start")
         end
     end))
     local function move(input)
@@ -121,11 +190,56 @@ do
     end))
     track(UserInputService.InputEnded:Connect(function(i)
         if i.UserInputType == Enum.UserInputType.MouseButton1
-        or i.UserInputType == Enum.UserInputType.Touch then dragging = false end
+        or i.UserInputType == Enum.UserInputType.Touch then
+            if dragging then log("Drag end") end
+            dragging = false
+        end
     end))
 end
 
--- Tabs
+-- Drag the OMAR pill
+do
+    local dragging, moved, dragStart, startPos = false, false, nil, nil
+    local function clamp(pos)
+        local vp = Camera.ViewportSize
+        local size = FloatPill.AbsoluteSize
+        local w = size.X > 0 and size.X or FloatPill.Size.X.Offset
+        local h = size.Y > 0 and size.Y or FloatPill.Size.Y.Offset
+        return UDim2.new(0, math.clamp(pos.X.Offset, 0, vp.X - w),
+                         0, math.clamp(pos.Y.Offset, 0, vp.Y - h))
+    end
+    track(FloatPill.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+            dragging, moved, dragStart, startPos = true, false, input.Position, FloatPill.Position
+        end
+    end))
+    track(UserInputService.InputChanged:Connect(function(input)
+        if not dragging then return end
+        if input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch then
+            local d = input.Position - dragStart
+            if math.abs(d.X) > 3 or math.abs(d.Y) > 3 then moved = true end
+            FloatPill.Position = clamp(UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X,
+                                                 startPos.Y.Scale, startPos.Y.Offset + d.Y))
+        end
+    end))
+    track(UserInputService.InputEnded:Connect(function(input)
+        if not dragging then return end
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+            if not moved then
+                log("OMAR tap open")
+                setUIVisible(true)
+            end
+            dragging, moved = false, false
+        end
+    end))
+end
+
+log("Drags wired")
+
+-- ============ TABS ============
 local TabsBar = Instance.new("Frame")
 TabsBar.Size = UDim2.new(1, -20, 0, 30)
 TabsBar.Position = UDim2.new(0, 10, 0, 40)
@@ -201,6 +315,8 @@ setActiveTab("aim")
 track(AimTabBtn.MouseButton1Click:Connect(function() setActiveTab("aim") end))
 track(SilentTabBtn.MouseButton1Click:Connect(function() setActiveTab("silent") end))
 track(EspTabBtn.MouseButton1Click:Connect(function() setActiveTab("esp") end))
+
+log("Tabs wired")
 
 -- ============ WIDGETS ============
 local function makeToggle(parent, text, yPos, default, callback)
@@ -349,7 +465,6 @@ makeToggle(AimPage, "Aimbot Enabled", ay, Config.Aimbot.Enabled, function(v) Con
 makeSwitch(AimPage, "Target:", ay, {"Head", "Torso"}, Config.Aimbot.TargetPart, function(v) Config.Aimbot.TargetPart = v end); ay = ay + 36
 makeSwitch(AimPage, "Lock Mode:", ay, {"Hold Mouse", "Always"}, Config.Aimbot.LockMode, function(v) Config.Aimbot.LockMode = v end); ay = ay + 36
 makeToggle(AimPage, "Team Check", ay, Config.Aimbot.TeamCheck, function(v) Config.Aimbot.TeamCheck = v end); ay = ay + 36
-makeToggle(AimPage, "Wall Check", ay, Config.Aimbot.WallCheck, function(v) Config.Aimbot.WallCheck = v end); ay = ay + 36
 makeSlider(AimPage, "Aimbot FOV", ay, 30, 500, Config.Aimbot.FOV, function(v) Config.Aimbot.FOV = v end); ay = ay + 48
 makeSlider(AimPage, "Smoothness", ay, 1, 100, Config.Aimbot.Smoothness, function(v) Config.Aimbot.Smoothness = v end); ay = ay + 48
 AimPage.CanvasSize = UDim2.new(0, 0, 0, ay + 6)
@@ -382,6 +497,8 @@ Credit.TextColor3 = Color3.fromRGB(180, 100, 240)
 Credit.Font = Enum.Font.GothamBold; Credit.TextSize = 12
 Credit.Parent = Main
 
+log("Widgets built")
+
 -- ============ FOV RINGS ============
 local FovRing = Instance.new("Frame")
 FovRing.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -394,7 +511,6 @@ Instance.new("UICorner", FovRing).CornerRadius = UDim.new(1, 0)
 local FovStroke = Instance.new("UIStroke", FovRing)
 FovStroke.Color = Color3.fromRGB(190, 110, 255)
 FovStroke.Thickness = 2.5
-FovStroke.Transparency = 0.1
 
 local SilentRing = Instance.new("Frame")
 SilentRing.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -407,15 +523,21 @@ Instance.new("UICorner", SilentRing).CornerRadius = UDim.new(1, 0)
 local SilentStroke = Instance.new("UIStroke", SilentRing)
 SilentStroke.Color = Color3.fromRGB(120, 220, 255)
 SilentStroke.Thickness = 2
-SilentStroke.Transparency = 0.1
 
-local SilentDot = Drawing.new("Circle")
-SilentDot.Thickness = 2
-SilentDot.Color = Color3.fromRGB(120, 220, 255)
-SilentDot.Filled = false
-SilentDot.Radius = 12
-SilentDot.Transparency = 1
-SilentDot.Visible = false
+-- Silent dot
+local SilentDot = nil
+if drawingOK then
+    pcall(function()
+        SilentDot = Drawing.new("Circle")
+        SilentDot.Thickness = 2
+        SilentDot.Color = Color3.fromRGB(120, 220, 255)
+        SilentDot.Filled = false
+        SilentDot.Radius = 12
+        SilentDot.Visible = false
+    end)
+end
+
+log("Rings created")
 
 -- ============ HELPERS ============
 local function isTeammate(player, teamCheckOn)
@@ -473,10 +595,14 @@ local function getCharTargets(teamCheckOn)
     return out
 end
 
--- ============ ESP ============
-local espObjects = {}
-local function createESP(character)
-    if espObjects[character] then return end
+log("Helpers ready")
+
+-- ============ ESP (Drawing OR Highlight fallback) ============
+local espDrawing = {}   -- character -> {objects}
+local espHighlight = {} -- character -> {highlight, billboard}
+
+local function createDrawingESP(character)
+    if espDrawing[character] then return end
     local d = {
         Box = Drawing.new("Square"),
         Name = Drawing.new("Text"),
@@ -489,103 +615,134 @@ local function createESP(character)
     d.Box.Filled = false
     d.Box.Transparency = 1
     d.Box.Visible = false
-
     for _, t in ipairs({d.Name, d.Distance}) do
-        t.Size = 14
-        t.Center = true
-        t.Outline = true
+        t.Size = 14; t.Center = true; t.Outline = true
         t.OutlineColor = Color3.fromRGB(0, 0, 0)
         t.Color = Color3.fromRGB(230, 200, 255)
-        t.Font = 2
-        t.Visible = false
+        t.Font = 2; t.Visible = false
     end
-
     d.HPBg.Filled = true
     d.HPBg.Color = Color3.fromRGB(0, 0, 0)
     d.HPBg.Transparency = 0.5
     d.HPBg.Visible = false
-
     d.HP.Filled = true
     d.HP.Color = Color3.fromRGB(0, 255, 0)
     d.HP.Transparency = 1
     d.HP.Visible = false
-
-    espObjects[character] = d
+    espDrawing[character] = d
 end
 
-local function removeESP(character)
-    local d = espObjects[character]
+local function removeDrawingESP(character)
+    local d = espDrawing[character]
     if not d then return end
     for _, obj in pairs(d) do pcall(function() obj:Remove() end) end
-    espObjects[character] = nil
+    espDrawing[character] = nil
 end
 
-local function setAllVisible(d, vis)
+local function setDrawingVisible(d, vis)
     for _, o in pairs(d) do o.Visible = vis end
 end
 
+local function createHighlightESP(character)
+    if espHighlight[character] then return end
+    local hl = Instance.new("Highlight")
+    hl.Name = "OmarESP"
+    hl.FillColor = Color3.fromRGB(120, 50, 200)
+    hl.FillTransparency = 0.6
+    hl.OutlineColor = Color3.fromRGB(200, 130, 255)
+    hl.OutlineTransparency = 0
+    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    hl.Adornee = character
+    hl.Parent = ScreenGui
+
+    local bb = Instance.new("BillboardGui")
+    bb.Name = "OmarESPName"
+    bb.Size = UDim2.new(0, 200, 0, 50)
+    bb.StudsOffset = Vector3.new(0, 3, 0)
+    bb.AlwaysOnTop = true
+    bb.Adornee = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
+    bb.Parent = ScreenGui
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.TextColor3 = Color3.fromRGB(230, 200, 255)
+    label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    label.TextStrokeTransparency = 0
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 14
+    label.Text = ""
+    label.Parent = bb
+
+    espHighlight[character] = { hl = hl, bb = bb, label = label }
+end
+
+local function removeHighlightESP(character)
+    local d = espHighlight[character]
+    if not d then return end
+    pcall(function() d.hl:Destroy() end)
+    pcall(function() d.bb:Destroy() end)
+    espHighlight[character] = nil
+end
+
 track(Workspace.DescendantRemoving:Connect(function(obj)
-    if espObjects[obj] then removeESP(obj) end
+    if espDrawing[obj] then removeDrawingESP(obj) end
+    if espHighlight[obj] then removeHighlightESP(obj) end
 end))
 track(Players.PlayerRemoving:Connect(function(p)
-    if p.Character then removeESP(p.Character) end
+    if p.Character then
+        removeDrawingESP(p.Character)
+        removeHighlightESP(p.Character)
+    end
 end))
 
-local function drawESP(char, name, hum)
-    if not espObjects[char] then createESP(char) end
-    local d = espObjects[char]
+local function drawDrawingESP(char, name, hum)
+    if not espDrawing[char] then createDrawingESP(char) end
+    local d = espDrawing[char]
     local hrp  = char:FindFirstChild("HumanoidRootPart")
     local head = char:FindFirstChild("Head")
-    if not (hrp and head) then setAllVisible(d, false); return end
+    if not (hrp and head) then setDrawingVisible(d, false); return end
 
     local headPos, onScreen = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
     local rootPos = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3, 0))
-    if not onScreen or headPos.Z < 0 then setAllVisible(d, false); return end
+    if not onScreen or headPos.Z < 0 then setDrawingVisible(d, false); return end
 
     local height = math.abs(rootPos.Y - headPos.Y)
     local width = height * 0.6
-    if height <= 0 or width <= 0 or height > Config.ESP.MaxBoxPixels then
-        setAllVisible(d, false); return
+    if height <= 0 or width <= 0 or height > 1500 then
+        setDrawingVisible(d, false); return
     end
 
     local topLeft     = Vector2.new(headPos.X - width / 2, headPos.Y)
     local bottomRight = Vector2.new(headPos.X + width / 2, rootPos.Y)
     local boxSize     = bottomRight - topLeft
 
+    d.Box.Visible = Config.ESP.ShowBox
     if Config.ESP.ShowBox then
-        d.Box.Visible = true
         d.Box.Size = boxSize
         d.Box.Position = topLeft
-    else
-        d.Box.Visible = false
     end
 
+    d.Name.Visible = Config.ESP.ShowName
     if Config.ESP.ShowName then
-        d.Name.Visible = true
         d.Name.Text = name
         d.Name.Position = Vector2.new(headPos.X, topLeft.Y - 16)
-    else
-        d.Name.Visible = false
     end
 
+    d.Distance.Visible = Config.ESP.ShowDistance
     if Config.ESP.ShowDistance then
-        d.Distance.Visible = true
         local dist = (Camera.CFrame.Position - hrp.Position).Magnitude
         d.Distance.Text = string.format("[%d studs]", math.floor(dist))
         d.Distance.Position = Vector2.new(headPos.X, bottomRight.Y + 2)
-    else
-        d.Distance.Visible = false
     end
 
     if Config.ESP.ShowHealth and hum then
         local hpPct = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
         local barH = boxSize.Y
         local barX = bottomRight.X + 4
-
         d.HPBg.Visible = true
         d.HPBg.Size = Vector2.new(4, barH)
         d.HPBg.Position = Vector2.new(barX, topLeft.Y)
-
         d.HP.Visible = true
         d.HP.Size = Vector2.new(4, barH * hpPct)
         d.HP.Position = Vector2.new(barX, topLeft.Y + barH * (1 - hpPct))
@@ -595,6 +752,8 @@ local function drawESP(char, name, hum)
         d.HPBg.Visible = false
     end
 end
+
+log("ESP system ready")
 
 -- ============ MOUSE STATE ============
 track(UserInputService.InputBegan:Connect(function(input, gp)
@@ -668,12 +827,11 @@ local function aimStep()
 end
 
 RunService:BindToRenderStep("OmarHubAimbot", Enum.RenderPriority.Camera.Value + 1, aimStep)
+log("Aimbot bound")
 
--- ============ SILENT AIM (safe, wrapped in pcall) ============
-local silentOK = false
+-- ============ SILENT AIM ============
 local silentFiring = false
 local silentTapUntil = 0
-local originalRaycast, originalRaycastAll
 
 local function silentTrigger()
     silentTapUntil = tick() + 0.2
@@ -724,10 +882,9 @@ local function findSilentTarget()
     return best
 end
 
--- Install raycast hooks inside pcall so an error can't kill the script
 pcall(function()
-    originalRaycast    = Workspace.Raycast
-    originalRaycastAll = Workspace.RaycastAll
+    local originalRaycast    = Workspace.Raycast
+    local originalRaycastAll = Workspace.RaycastAll
 
     Workspace.Raycast = function(self, origin, direction, params)
         if self == Workspace and Config.SilentAim.Enabled and isFiringNow() then
@@ -737,18 +894,11 @@ pcall(function()
                     return nil
                 end
                 if (origin - Camera.CFrame.Position).Magnitude > 30 then return nil end
-                if direction.Magnitude > 0.001 then
-                    if direction.Unit:Dot(Camera.CFrame.LookVector) < 0.1 then return nil end
+                if direction.Magnitude > 0.001 and direction.Unit:Dot(Camera.CFrame.LookVector) < 0.1 then
+                    return nil
                 end
                 local target = findSilentTarget()
                 if not target then return nil end
-                if params and params.FilterDescendantsInstances then
-                    for _, inst in ipairs(params.FilterDescendantsInstances) do
-                        if inst == target or inst == target.Parent then
-                            return nil
-                        end
-                    end
-                end
                 return target.Position - origin
             end)
             if ok and result then
@@ -762,13 +912,6 @@ pcall(function()
         if self == Workspace and Config.SilentAim.Enabled and isFiringNow() then
             local ok, result = pcall(function()
                 if Config.SilentAim.HitChance <= 0 then return nil end
-                if Config.SilentAim.HitChance < 100 and math.random(1, 100) > Config.SilentAim.HitChance then
-                    return nil
-                end
-                if (origin - Camera.CFrame.Position).Magnitude > 30 then return nil end
-                if direction.Magnitude > 0.001 then
-                    if direction.Unit:Dot(Camera.CFrame.LookVector) < 0.1 then return nil end
-                end
                 local target = findSilentTarget()
                 if not target then return nil end
                 return target.Position - origin
@@ -780,10 +923,13 @@ pcall(function()
         return originalRaycastAll(self, origin, direction, params)
     end
 
-    silentOK = true
+    -- keep references for shutdown
+    _G.__OmarRaycast = originalRaycast
+    _G.__OmarRaycastAll = originalRaycastAll
+    log("Silent aim hooks installed")
 end)
 
--- Silent ring UI updater (independent of aimbot)
+-- Silent ring UI
 track(RunService.RenderStepped:Connect(function()
     if Config.SilentAim.Enabled then
         local r = Config.SilentAim.FOV
@@ -791,28 +937,34 @@ track(RunService.RenderStepped:Connect(function()
         SilentRing.Position = UDim2.new(0.5, 0, 0.5, 0)
         SilentRing.Visible = true
 
-        local st = findSilentTarget()
-        if st then
-            local sp, on = Camera:WorldToViewportPoint(st.Position)
-            if on and sp.Z > 0 then
-                SilentDot.Visible = true
-                SilentDot.Position = Vector2.new(sp.X, sp.Y)
+        if SilentDot then
+            local st = findSilentTarget()
+            if st then
+                local sp, on = Camera:WorldToViewportPoint(st.Position)
+                if on and sp.Z > 0 then
+                    SilentDot.Visible = true
+                    SilentDot.Position = Vector2.new(sp.X, sp.Y)
+                else
+                    SilentDot.Visible = false
+                end
             else
                 SilentDot.Visible = false
             end
-        else
-            SilentDot.Visible = false
         end
     else
         SilentRing.Visible = false
-        SilentDot.Visible = false
+        if SilentDot then SilentDot.Visible = false end
     end
 end))
 
 -- ============ ESP RENDER ============
 track(RunService.RenderStepped:Connect(function()
     if not Config.ESP.Enabled then
-        for _, d in pairs(espObjects) do setAllVisible(d, false) end
+        for _, d in pairs(espDrawing) do setDrawingVisible(d, false) end
+        for _, d in pairs(espHighlight) do
+            if d.hl then d.hl.Enabled = false end
+            if d.bb then d.bb.Enabled = false end
+        end
         return
     end
 
@@ -826,15 +978,41 @@ track(RunService.RenderStepped:Connect(function()
         if char and hum then
             local name = (p.DisplayName ~= "" and p.DisplayName) or p.Name
             live[char] = true
-            drawESP(char, name, hum)
+
+            if drawingOK then
+                drawDrawingESP(char, name, hum)
+            else
+                -- Highlight fallback
+                if not espHighlight[char] then createHighlightESP(char) end
+                local h = espHighlight[char]
+                if h then
+                    h.hl.Enabled = true
+                    h.bb.Enabled = true
+                    local dist = math.floor((Camera.CFrame.Position - char.HumanoidRootPart.Position).Magnitude)
+                    local hpPct = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+                    h.label.Text = string.format("%s\n[%d studs]  HP:%d%%", name, dist, math.floor(hpPct * 100))
+                    h.label.TextColor3 = Color3.fromRGB(
+                        math.floor(255 * (1 - hpPct)),
+                        math.floor(255 * hpPct),
+                        math.floor(100 * hpPct)
+                    )
+                end
+            end
         end
     end
-    for char, d in pairs(espObjects) do
-        if not live[char] then setAllVisible(d, false) end
+
+    for char, d in pairs(espDrawing) do
+        if not live[char] then setDrawingVisible(d, false) end
+    end
+    for char, d in pairs(espHighlight) do
+        if not live[char] then
+            if d.hl then d.hl.Enabled = false end
+            if d.bb then d.bb.Enabled = false end
+        end
     end
 end))
 
--- Restore auto-rotate when aimbot off
+-- Restore autorotate
 track(RunService.Stepped:Connect(function()
     if Config.Aimbot.Enabled then return end
     local char = LocalPlayer.Character
@@ -842,67 +1020,41 @@ track(RunService.Stepped:Connect(function()
     if hum and not hum.AutoRotate then hum.AutoRotate = true end
 end))
 
--- ============ OMAR PILL ============
-local FloatPill = Instance.new("TextButton")
-FloatPill.Size = UDim2.new(0, 72, 0, 28)
-FloatPill.Position = UDim2.new(0, 14, 1, -80)
-FloatPill.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-FloatPill.Text = "OMAR"
-FloatPill.TextColor3 = Color3.fromRGB(180, 100, 240)
-FloatPill.Font = Enum.Font.GothamBold
-FloatPill.TextSize = 12
-FloatPill.BorderSizePixel = 0
-FloatPill.AutoButtonColor = false
-FloatPill.ZIndex = 500
-FloatPill.Visible = false
-FloatPill.Parent = ScreenGui
-Instance.new("UICorner", FloatPill).CornerRadius = UDim.new(0, 6)
-local PillStroke = Instance.new("UIStroke", FloatPill)
-PillStroke.Color = Color3.fromRGB(150, 70, 220)
-PillStroke.Thickness = 1.5
+-- ============ FULL SHUTDOWN (re-wire CloseBtn) ============
+-- Disconnect the earlier "hide" close connection and set up real shutdown
+-- (we just redefine by connecting another one and gating)
+local shuttingDown = false
+track(CloseBtn.MouseButton1Click:Connect(function()
+    if shuttingDown then return end
+    shuttingDown = true
+    log("Shutting down")
 
-track(FloatPill.MouseButton1Click:Connect(function()
-    if not FloatPill.Visible then return end
-    Main.Visible = true
-    FloatPill.Visible = false
-end))
-
--- ============ BUTTONS ============
-local function setUIVisible(vis)
-    Main.Visible = vis
-    FloatPill.Visible = not vis
-end
-
-track(ToggleBtn.MouseButton1Click:Connect(function()
-    setUIVisible(false)
-end))
-
-track(UserInputService.InputBegan:Connect(function(input, gp)
-    if gp then return end
-    if input.KeyCode == Config.ToggleKey then
-        setUIVisible(not Main.Visible)
-    end
-end))
-
-local function shutdown()
     pcall(function() RunService:UnbindFromRenderStep("OmarHubAimbot") end)
-    if originalRaycast then
-        pcall(function() Workspace.Raycast = originalRaycast end)
+    if _G.__OmarRaycast then
+        pcall(function() Workspace.Raycast = _G.__OmarRaycast end)
     end
-    if originalRaycastAll then
-        pcall(function() Workspace.RaycastAll = originalRaycastAll end)
+    if _G.__OmarRaycastAll then
+        pcall(function() Workspace.RaycastAll = _G.__OmarRaycastAll end)
     end
+
     local char = LocalPlayer.Character
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     if hum then hum.AutoRotate = true end
-    for _, d in pairs(espObjects) do
+
+    for _, d in pairs(espDrawing) do
         for _, obj in pairs(d) do pcall(function() obj:Remove() end) end
     end
-    espObjects = {}
-    pcall(function() SilentDot:Remove() end)
+    espDrawing = {}
+    for _, d in pairs(espHighlight) do
+        pcall(function() d.hl:Destroy() end)
+        pcall(function() d.bb:Destroy() end)
+    end
+    espHighlight = {}
+    if SilentDot then pcall(function() SilentDot:Remove() end) end
+
     for _, c in ipairs(connections) do pcall(function() c:Disconnect() end) end
     connections = {}
     pcall(function() ScreenGui:Destroy() end)
-end
+end))
 
-track(CloseBtn.MouseButton1Click:Connect(shutdown))
+log("Script loaded successfully.")
