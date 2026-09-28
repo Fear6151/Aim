@@ -1,5 +1,5 @@
 --[[
-    Omar Hub v13
+    Omar Hub v15
     Credit: Made by Omar
     For use ONLY in your own Roblox game.
 --]]
@@ -29,7 +29,7 @@ local Config = {
         TeamCheck  = true,
         MaxDist    = 1000,
         Smoothness = 100,
-        LockMode   = "Hold Mouse",
+        LockMode   = "Hold Mouse", -- "Hold Mouse" | "Always"
     },
     ToggleKey = Enum.KeyCode.RightShift,
 }
@@ -116,29 +116,133 @@ CloseBtn.BorderSizePixel = 0
 CloseBtn.Parent = BtnRow
 Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
 
--- OMAR floating draggable pill
+-- ================================================================
+-- FLOATING QUICK-PILLS (OMAR + AIM) — mobile-safe, draggable
+-- ================================================================
+
+-- Shared drag helper: makes any GuiObject draggable with tap detection
+local function makeDraggable(button, onTap)
+    local dragging  = false
+    local moved     = false
+    local dragStart = nil
+    local startPos  = nil
+
+    local function clampToViewport(pos)
+        local vp = Camera.ViewportSize
+        local size = button.AbsoluteSize
+        local w = size.X > 0 and size.X or button.Size.X.Offset
+        local h = size.Y > 0 and size.Y or button.Size.Y.Offset
+        local x = math.clamp(pos.X.Offset, 0, vp.X - w)
+        local y = math.clamp(pos.Y.Offset, 0, vp.Y - h)
+        return UDim2.new(0, x, 0, y)
+    end
+
+    track(button.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+            dragging  = true
+            moved     = false
+            dragStart = input.Position
+            startPos  = button.Position
+        end
+    end))
+
+    track(UserInputService.InputChanged:Connect(function(input)
+        if not dragging then return end
+        if input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch then
+            local d = input.Position - dragStart
+            if math.abs(d.X) > 3 or math.abs(d.Y) > 3 then moved = true end
+            local newPos = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + d.X,
+                startPos.Y.Scale, startPos.Y.Offset + d.Y
+            )
+            button.Position = clampToViewport(newPos)
+        end
+    end))
+
+    track(UserInputService.InputEnded:Connect(function(input)
+        if not dragging then return end
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+            if not moved and onTap then onTap() end
+            dragging = false
+            moved    = false
+        end
+    end))
+end
+
+-- -------- OMAR pill (open/close menu) --------
 local FloatPill = Instance.new("TextButton")
-FloatPill.Size = UDim2.new(0, 92, 0, 38)
-FloatPill.Position = UDim2.new(0, 12, 0, 90)
+FloatPill.Name = "OmarPill"
+FloatPill.Size = UDim2.new(0, 72, 0, 28)
+FloatPill.Position = UDim2.new(0, 14, 0, 90)
 FloatPill.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 FloatPill.Text = "OMAR"
 FloatPill.TextColor3 = Color3.fromRGB(180, 100, 240)
 FloatPill.Font = Enum.Font.GothamBold
-FloatPill.TextSize = 15
+FloatPill.TextSize = 12
 FloatPill.BorderSizePixel = 0
 FloatPill.AutoButtonColor = false
 FloatPill.Active = true
 FloatPill.ZIndex = 500
 FloatPill.Visible = false
 FloatPill.Parent = ScreenGui
-Instance.new("UICorner", FloatPill).CornerRadius = UDim.new(0, 10)
-
+Instance.new("UICorner", FloatPill).CornerRadius = UDim.new(0, 6)
 local PillStroke = Instance.new("UIStroke", FloatPill)
 PillStroke.Color = Color3.fromRGB(150, 70, 220)
 PillStroke.Thickness = 1.5
-PillStroke.Transparency = 0.2
+PillStroke.Transparency = 0.15
 
--- Drag main panel
+makeDraggable(FloatPill, function()
+    Main.Visible = true
+    FloatPill.Visible = false
+    AimPill.Visible = false
+end)
+
+-- -------- AIM pill (quick aimbot toggle) --------
+local AimPill = Instance.new("TextButton")
+AimPill.Name = "AimPill"
+AimPill.Size = UDim2.new(0, 72, 0, 28)
+AimPill.Position = UDim2.new(0, 14, 0, 124)
+AimPill.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+AimPill.Text = "AIM: OFF"
+AimPill.TextColor3 = Color3.fromRGB(200, 90, 120)
+AimPill.Font = Enum.Font.GothamBold
+AimPill.TextSize = 12
+AimPill.BorderSizePixel = 0
+AimPill.AutoButtonColor = false
+AimPill.Active = true
+AimPill.ZIndex = 500
+AimPill.Visible = false
+AimPill.Parent = ScreenGui
+Instance.new("UICorner", AimPill).CornerRadius = UDim.new(0, 6)
+local AimStroke = Instance.new("UIStroke", AimPill)
+AimStroke.Color = Color3.fromRGB(200, 60, 100)
+AimStroke.Thickness = 1.5
+AimStroke.Transparency = 0.15
+
+local function refreshAimPill()
+    if Config.Aimbot.Enabled then
+        AimPill.Text = "AIM: ON"
+        AimPill.TextColor3 = Color3.fromRGB(120, 255, 160)
+        AimStroke.Color = Color3.fromRGB(80, 220, 130)
+    else
+        AimPill.Text = "AIM: OFF"
+        AimPill.TextColor3 = Color3.fromRGB(200, 90, 120)
+        AimStroke.Color = Color3.fromRGB(200, 60, 100)
+    end
+end
+refreshAimPill()
+
+makeDraggable(AimPill, function()
+    Config.Aimbot.Enabled = not Config.Aimbot.Enabled
+    refreshAimPill()
+    -- The Heartbeat watcher inside the aimbot section detects the change and
+    -- rebinds/unbinds automatically.
+end)
+
+-- Drag main panel by its title bar
 do
     local dragging, dragStart, startPos = false, nil, nil
     track(TitleBar.InputBegan:Connect(function(input)
@@ -166,50 +270,6 @@ do
     track(UserInputService.InputEnded:Connect(function(i)
         if i.UserInputType == Enum.UserInputType.MouseButton1
         or i.UserInputType == Enum.UserInputType.Touch then dragging = false end
-    end))
-end
-
--- Drag OMAR pill
-do
-    local dragging, moved, dragStart, startPos = false, false, nil, nil
-    local function clamp(pos)
-        local vp = Camera.ViewportSize
-        local x = math.clamp(pos.X.Offset, 0, vp.X - FloatPill.Size.X.Offset)
-        local y = math.clamp(pos.Y.Offset, 0, vp.Y - FloatPill.Size.Y.Offset)
-        return UDim2.new(0, x, 0, y)
-    end
-    track(FloatPill.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1
-        or input.UserInputType == Enum.UserInputType.Touch then
-            dragging, moved, dragStart, startPos = true, false, input.Position, FloatPill.Position
-        end
-    end))
-    local function move(input)
-        if not dragging then return end
-        local d = input.Position - dragStart
-        if math.abs(d.X) > 4 or math.abs(d.Y) > 4 then moved = true end
-        FloatPill.Position = clamp(UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X,
-                                             startPos.Y.Scale, startPos.Y.Offset + d.Y))
-    end
-    track(FloatPill.InputChanged:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.MouseMovement
-        or i.UserInputType == Enum.UserInputType.Touch then move(i) end
-    end))
-    track(UserInputService.InputChanged:Connect(function(i)
-        if not dragging then return end
-        if i.UserInputType == Enum.UserInputType.MouseMovement
-        or i.UserInputType == Enum.UserInputType.Touch then move(i) end
-    end))
-    track(UserInputService.InputEnded:Connect(function(i)
-        if not dragging then return end
-        if i.UserInputType == Enum.UserInputType.MouseButton1
-        or i.UserInputType == Enum.UserInputType.Touch then
-            if not moved then
-                Main.Visible = true
-                FloatPill.Visible = false
-            end
-            dragging, moved = false, false
-        end
     end))
 end
 
@@ -436,7 +496,7 @@ local function makeSlider(parent, text, yPos, min, max, default, callback)
     return Frame
 end
 
--- ============ PAGES ============
+-- ============ ESP PAGE ============
 local ey = 4
 makeToggle(EspPage, "ESP Enabled", ey, Config.ESP.Enabled, function(v) Config.ESP.Enabled = v end); ey = ey + 36
 makeToggle(EspPage, "Show Name", ey, Config.ESP.ShowName, function(v) Config.ESP.ShowName = v end); ey = ey + 36
@@ -446,8 +506,12 @@ makeToggle(EspPage, "Show Box", ey, Config.ESP.ShowBox, function(v) Config.ESP.S
 makeToggle(EspPage, "Team Check", ey, Config.ESP.TeamCheck, function(v) Config.ESP.TeamCheck = v end); ey = ey + 36
 EspPage.CanvasSize = UDim2.new(0, 0, 0, ey + 6)
 
+-- ============ AIMBOT PAGE ============
 local ay = 4
-makeToggle(AimPage, "Aimbot Enabled", ay, Config.Aimbot.Enabled, function(v) Config.Aimbot.Enabled = v end); ay = ay + 36
+makeToggle(AimPage, "Aimbot Enabled", ay, Config.Aimbot.Enabled, function(v)
+    Config.Aimbot.Enabled = v
+    refreshAimPill()
+end); ay = ay + 36
 makeSwitch(AimPage, "Target:", ay, {"Head", "Torso"}, Config.Aimbot.TargetPart, function(v) Config.Aimbot.TargetPart = v end); ay = ay + 36
 makeSwitch(AimPage, "Lock Mode:", ay, {"Hold Mouse", "Always"}, Config.Aimbot.LockMode, function(v) Config.Aimbot.LockMode = v end); ay = ay + 36
 makeToggle(AimPage, "Team Check", ay, Config.Aimbot.TeamCheck, function(v) Config.Aimbot.TeamCheck = v end); ay = ay + 36
@@ -465,7 +529,7 @@ Credit.Font = Enum.Font.GothamBold
 Credit.TextSize = 12
 Credit.Parent = Main
 
--- ============ FOV CIRCLE (visible, thick, with ticks) ============
+-- ============ FOV CIRCLE (visible, thick, with center dot) ============
 local FovRing = Instance.new("Frame")
 FovRing.AnchorPoint = Vector2.new(0.5, 0.5)
 FovRing.BackgroundTransparency = 1
@@ -474,13 +538,11 @@ FovRing.ZIndex = 1
 FovRing.Parent = ScreenGui
 Instance.new("UICorner", FovRing).CornerRadius = UDim.new(1, 0)
 
--- Outer ring (bright)
 local FovStrokeOuter = Instance.new("UIStroke", FovRing)
 FovStrokeOuter.Color = Color3.fromRGB(190, 110, 255)
 FovStrokeOuter.Thickness = 2.5
 FovStrokeOuter.Transparency = 0.1
 
--- Inner ring (soft glow)
 local FovGlow = Instance.new("Frame")
 FovGlow.AnchorPoint = Vector2.new(0.5, 0.5)
 FovGlow.Position = UDim2.new(0.5, 0, 0.5, 0)
@@ -494,7 +556,6 @@ FovStrokeInner.Color = Color3.fromRGB(255, 180, 255)
 FovStrokeInner.Thickness = 1
 FovStrokeInner.Transparency = 0.6
 
--- Crosshair center dot (tells you where the FOV is measured from)
 local CenterDot = Instance.new("Frame")
 CenterDot.Size = UDim2.new(0, 6, 0, 6)
 CenterDot.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -508,7 +569,7 @@ local CenterStroke = Instance.new("UIStroke", CenterDot)
 CenterStroke.Color = Color3.fromRGB(90, 40, 140)
 CenterStroke.Thickness = 1
 
--- Target dots
+-- Target dots (Drawing)
 local TargetDot = Drawing.new("Circle")
 TargetDot.Thickness = 2
 TargetDot.Color = Color3.fromRGB(255, 80, 255)
@@ -532,13 +593,16 @@ local function isTeammate(player)
     if a == nil or b == nil then return false end
     return a == b
 end
+
 local function isAliveHumanoid(hum) return hum and hum.Health > 0 end
+
 local function hasValidRig(model)
     if not model or not model.Parent then return false end
     local head = model:FindFirstChild("Head")
     local hrp  = model:FindFirstChild("HumanoidRootPart")
     return head and head:IsA("BasePart") and hrp and hrp:IsA("BasePart")
 end
+
 local function getTargetPart(char)
     if not hasValidRig(char) then return nil end
     if Config.Aimbot.TargetPart == "Head" then
@@ -612,6 +676,7 @@ end
 
 -- ============ ESP ============
 local espObjects = {}
+
 local function createESP(character)
     if espObjects[character] then return end
     local d = {
@@ -743,7 +808,7 @@ local function drawESP(t)
     end
 end
 
--- ============ MOUSE STATE ============
+-- ============ MOUSE STATE (for Hold-Mouse mode) ============
 local mouseHeld = false
 track(UserInputService.InputBegan:Connect(function(input, gp)
     if gp then return end
@@ -817,7 +882,7 @@ local function targetIsValid(part)
 end
 
 local function aimStep()
-    -- FOV ring visibility
+    -- FOV ring visibility follows Aimbot state
     if Config.Aimbot.Enabled then
         local radius = Config.Aimbot.FOV
         FovRing.Size = UDim2.new(0, radius * 2, 0, radius * 2)
@@ -836,10 +901,10 @@ local function aimStep()
         return
     end
 
-    -- Hold-Mouse gate: don't do anything (no lock, no char rotation) unless firing
+    -- Hold-Mouse gate: don't lock camera / rotate character unless firing
     local gated = (Config.Aimbot.LockMode == "Hold Mouse") and not mouseHeld
 
-    -- Always try to preview the target (so the pink dot shows even when idle)
+    -- Refresh target
     if not targetIsValid(currentTarget) then
         currentTarget = nil
     end
@@ -855,7 +920,7 @@ local function aimStep()
         currentTarget = findBestTarget()
     end
 
-    -- Draw the target dot (always, whether firing or not)
+    -- Always draw target dot (preview) even when gated
     if currentTarget then
         local sp, on = Camera:WorldToViewportPoint(currentTarget.Position)
         if on and sp.Z > 0 then
@@ -872,7 +937,6 @@ local function aimStep()
         TargetDotInner.Visible = false
     end
 
-    -- If gated (Hold Mouse and not firing), do NOT lock camera / rotate character
     if gated or not currentTarget then return end
 
     local aimPos = currentTarget.Position
@@ -883,7 +947,7 @@ local function aimStep()
     local desiredCF = CFrame.new(curCF.Position, aimPos)
     Camera.CFrame = curCF:Lerp(desiredCF, alpha)
 
-    -- Character rotation lock — only when locked fairly hard
+    -- Character rotation lock — only when locking fairly hard
     if alpha >= 0.4 then
         local char = LocalPlayer.Character
         local hrp  = char and char:FindFirstChild("HumanoidRootPart")
@@ -921,15 +985,17 @@ local function refreshBinding()
     end
 end
 
+-- Watch Aimbot.Enabled and rebind on change (covers both pill and menu toggles)
 local oldEnabled = Config.Aimbot.Enabled
 track(RunService.Heartbeat:Connect(function()
     if Config.Aimbot.Enabled ~= oldEnabled then
         oldEnabled = Config.Aimbot.Enabled
         refreshBinding()
+        refreshAimPill()
     end
 end))
 
--- If aimbot is off, ensure AutoRotate stays on
+-- Ensure AutoRotate is restored whenever aimbot is off
 track(RunService.Stepped:Connect(function()
     if Config.Aimbot.Enabled then return end
     local char = LocalPlayer.Character
@@ -971,14 +1037,10 @@ end))
 local function setUIVisible(vis)
     Main.Visible = vis
     FloatPill.Visible = not vis
+    AimPill.Visible = not vis
 end
 
 track(ToggleBtn.MouseButton1Click:Connect(function() setUIVisible(false) end))
-track(FloatPill.MouseButton1Click:Connect(function()
-    -- Only fires if not dragging (handled by the drag code above)
-    Main.Visible = true
-    FloatPill.Visible = false
-end))
 track(UserInputService.InputBegan:Connect(function(input, gp)
     if gp then return end
     if input.KeyCode == Config.ToggleKey then
