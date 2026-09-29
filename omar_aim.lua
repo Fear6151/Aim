@@ -1,7 +1,7 @@
 --[[
     Omar Hub
     Credit: Made by Omar
-   
+    
 --]]
 
 local Players          = game:GetService("Players")
@@ -36,6 +36,25 @@ local Config = {
 
 local connections = {}
 local function track(c) table.insert(connections, c); return c end
+
+-- ============ DEBUG: show team info on start ============
+task.spawn(function()
+    task.wait(2)
+    print("======== [OmarHub] Team Debug ========")
+    print("LocalPlayer.Team:", tostring(LocalPlayer.Team))
+    print("LocalPlayer.TeamColor:", tostring(LocalPlayer.TeamColor))
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            print(string.format("  Player %s | Team=%s | TeamColor=%s | Attr Team=%s",
+                p.Name,
+                tostring(p.Team),
+                tostring(p.TeamColor),
+                tostring(p:GetAttribute("Team"))
+            ))
+        end
+    end
+    print("======================================")
+end)
 
 -- ============ UI ============
 local ScreenGui = Instance.new("ScreenGui")
@@ -186,7 +205,6 @@ local FloatPill = Instance.new("TextButton")
 FloatPill.Size = UDim2.new(0, 72, 0, 28)
 FloatPill.Position = UDim2.new(0, 14, 1, -80)
 FloatPill.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-FloatPill.BackgroundTransparency = 0
 FloatPill.Text = "OMAR"
 FloatPill.TextColor3 = Color3.fromRGB(180, 100, 240)
 FloatPill.Font = Enum.Font.GothamBold
@@ -206,7 +224,6 @@ local AimPill = Instance.new("TextButton")
 AimPill.Size = UDim2.new(0, 72, 0, 28)
 AimPill.Position = UDim2.new(0, 14, 1, -46)
 AimPill.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-AimPill.BackgroundTransparency = 0
 AimPill.Text = "AIM: OFF"
 AimPill.TextColor3 = Color3.fromRGB(200, 90, 120)
 AimPill.Font = Enum.Font.GothamBold
@@ -377,7 +394,6 @@ local function makeToggle(parent, text, yPos, default, callback)
     Pill.Size = UDim2.new(0, 38, 0, 18)
     Pill.Position = UDim2.new(1, -46, 0.5, -9)
     Pill.BackgroundColor3 = default and Color3.fromRGB(150, 70, 220) or Color3.fromRGB(60, 40, 80)
-    Pill.BackgroundTransparency = 0
     Pill.BorderSizePixel = 0
     Pill.ZIndex = 4
     Pill.Parent = Btn
@@ -387,7 +403,6 @@ local function makeToggle(parent, text, yPos, default, callback)
     Knob.Size = UDim2.new(0, 14, 0, 14)
     Knob.Position = default and UDim2.new(1, -16, 0.5, -7) or UDim2.new(0, 2, 0.5, -7)
     Knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    Knob.BackgroundTransparency = 0
     Knob.BorderSizePixel = 0
     Knob.ZIndex = 5
     Knob.Parent = Pill
@@ -430,7 +445,6 @@ local function makeSwitch(parent, text, yPos, options, default, callback)
     Container.Size = UDim2.new(0, 180, 0, 20)
     Container.Position = UDim2.new(1, -186, 0.5, -10)
     Container.BackgroundColor3 = Color3.fromRGB(20, 12, 30)
-    Container.BackgroundTransparency = 0.15
     Container.BorderSizePixel = 0
     Container.ZIndex = 4
     Container.Parent = Frame
@@ -441,7 +455,6 @@ local function makeSwitch(parent, text, yPos, options, default, callback)
         b.Size = UDim2.new(1/#options, -2, 1, -4)
         b.Position = UDim2.new((i-1)/#options, 1, 0, 2)
         b.BackgroundColor3 = (opt == default) and Color3.fromRGB(150, 70, 220) or Color3.fromRGB(50, 30, 70)
-        b.BackgroundTransparency = 0
         b.Text = opt
         b.TextColor3 = Color3.fromRGB(240, 220, 255)
         b.Font = Enum.Font.GothamBold
@@ -486,7 +499,6 @@ local function makeSlider(parent, text, yPos, min, max, default, callback)
     Bar.Size = UDim2.new(1, 0, 0, 12)
     Bar.Position = UDim2.new(0, 0, 0, 18)
     Bar.BackgroundColor3 = Color3.fromRGB(35, 20, 50)
-    Bar.BackgroundTransparency = 0.15
     Bar.BorderSizePixel = 0
     Bar.ZIndex = 4
     Bar.Parent = Frame
@@ -495,7 +507,6 @@ local function makeSlider(parent, text, yPos, min, max, default, callback)
     local Fill = Instance.new("Frame")
     Fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
     Fill.BackgroundColor3 = Color3.fromRGB(150, 70, 220)
-    Fill.BackgroundTransparency = 0
     Fill.BorderSizePixel = 0
     Fill.ZIndex = 5
     Fill.Parent = Bar
@@ -614,15 +625,63 @@ TargetDotInner.Radius = 4
 TargetDotInner.Transparency = 1
 TargetDotInner.Visible = false
 
--- ============ HELPERS ============
-local function isTeammate(player)
-    if player == LocalPlayer then return false end
-    local a, b = player.Team, LocalPlayer.Team
-    if a == nil or b == nil then return false end
-    return a == b
+-- ============ HARD TEAM CHECK (multi-source) ============
+--[[
+    Different games store teams differently:
+      • player.Team            (standard Roblox teams)
+      • player.TeamColor       (color-only teams)
+      • player:GetAttribute("Team")  (attribute-based teams)
+      • player.TeamName.Value  (custom StringValue inside Player)
+      • ReplicatedStorage / Teams folder (custom team system)
+
+    We check as many as possible so if ANY indicates a match → teammate.
+]]
+local function getTeamSignature(plr)
+    if not plr then return nil end
+    local sigs = {}
+
+    -- Standard Roblox Team object
+    if plr.Team ~= nil then
+        sigs[#sigs + 1] = "Team:" .. tostring(plr.Team)
+    end
+
+    -- TeamColor (some games use this without a Team object)
+    if plr.TeamColor ~= nil and plr.TeamColor ~= BrickColor.new("Medium stone grey") then
+        sigs[#sigs + 1] = "Color:" .. tostring(plr.TeamColor)
+    end
+
+    -- Attribute "Team"
+    local attrTeam = plr:GetAttribute("Team")
+    if attrTeam ~= nil then
+        sigs[#sigs + 1] = "Attr:" .. tostring(attrTeam)
+    end
+
+    -- Child Value/StringValue named "Team" or "TeamName"
+    for _, childName in ipairs({"Team", "TeamName"}) do
+        local c = plr:FindFirstChild(childName)
+        if c and c:IsA("ValueBase") then
+            sigs[#sigs + 1] = childName .. ":" .. tostring(c.Value)
+        end
+    end
+
+    if #sigs == 0 then return nil end
+    return table.concat(sigs, "|")
 end
 
--- Strict alive check — returns the humanoid only if it's alive AND has a rig
+local function isTeammate(plr)
+    if plr == LocalPlayer then return false end
+    local mySig = getTeamSignature(LocalPlayer)
+    local theirSig = getTeamSignature(plr)
+    if not mySig or not theirSig then return false end
+    -- Any shared identifier → teammate
+    for _, my in ipairs(string.split(mySig, "|")) do
+        for _, their in ipairs(string.split(theirSig, "|")) do
+            if my == their then return true end
+        end
+    end
+    return false
+end
+
 local function getAliveHumanoid(char)
     if not char or not char.Parent then return nil end
     local hum = char:FindFirstChildOfClass("Humanoid")
@@ -664,14 +723,12 @@ local function hasLineOfSight(targetPart)
     return hit == nil
 end
 
--- Collect player targets with EXPLICIT team check
 local function getPlayerTargets(useTeamCheck)
     local out = {}
     for _, player in ipairs(Players:GetPlayers()) do
         if player == LocalPlayer then continue end
         local char = player.Character
         if not char or not char.Parent then continue end
-        -- STRICT: skip dead humans first
         local hum = getAliveHumanoid(char)
         if not hum then continue end
         if useTeamCheck and isTeammate(player) then continue end
@@ -795,7 +852,6 @@ local function drawESP(t)
     local char = t.character
     if not espObjects[char] then createESP(char) end
     local d = espObjects[char]
-    -- STRICT alive check — if dead, hide everything
     local hum = getAliveHumanoid(char)
     local hrp  = char:FindFirstChild("HumanoidRootPart")
     local head = char:FindFirstChild("Head")
@@ -926,14 +982,12 @@ local AIMBOT_BIND_NAME = "OmarHubAimbot"
 local bound = false
 local currentTarget = nil
 
--- STRICT target validation, includes team check for instant drop of teammates
 local function targetIsValid(part)
     if not part or not part.Parent then return false end
     if not part:IsDescendantOf(Workspace) then return false end
     local char = part.Parent
     local hum = getAliveHumanoid(char)
     if not hum then return false end
-    -- Team check: if enabled and target is a teammate player → invalid immediately
     if Config.Aimbot.TeamCheck then
         local plr = Players:GetPlayerFromCharacter(char)
         if plr and isTeammate(plr) then return false end
@@ -963,7 +1017,6 @@ local function aimStep()
 
     local gated = (Config.Aimbot.LockMode == "Hold Mouse") and not mouseHeld
 
-    -- Re-validate target every frame. If it's a teammate now, drop it.
     if not targetIsValid(currentTarget) then
         currentTarget = nil
     end
