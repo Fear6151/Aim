@@ -1,7 +1,7 @@
 --[[
     Omar Hub
     Credit: Made by Omar
-    
+   
 --]]
 
 local Players          = game:GetService("Players")
@@ -47,13 +47,13 @@ ScreenGui.DisplayOrder = 999
 ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local Main = Instance.new("Frame")
-Main.Size = UDim2.new(0, 420, 0, 400)
-Main.Position = UDim2.new(0.5, -210, 0.5, -200)
+Main.Size = UDim2.new(0, 420, 0, 330)
+Main.Position = UDim2.new(0.5, -210, 0.5, -165)
 Main.BackgroundColor3 = Color3.fromRGB(15, 10, 20)
 Main.BackgroundTransparency = 0
 Main.BorderSizePixel = 0
 Main.Active = false
-Main.ClipsDescendants = true           -- keeps the background image inside the frame
+Main.ClipsDescendants = true
 Main.Parent = ScreenGui
 Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 10)
 
@@ -62,24 +62,18 @@ Stroke.Color = Color3.fromRGB(140, 60, 220)
 Stroke.Thickness = 1.5
 Stroke.Transparency = 0.15
 
--- ============ BACKGROUND IMAGE ============
 local BgImage = Instance.new("ImageLabel")
-BgImage.Name = "Background"
 BgImage.Size = UDim2.new(1, 0, 1, 0)
-BgImage.Position = UDim2.new(0, 0, 0, 0)
 BgImage.BackgroundTransparency = 1
 BgImage.Image = "rbxassetid://78398641131333"
-BgImage.ImageTransparency = 0.35          -- dim so text stays readable
+BgImage.ImageTransparency = 0.35
 BgImage.ScaleType = Enum.ScaleType.Crop
 BgImage.ZIndex = 0
 BgImage.Parent = Main
 Instance.new("UICorner", BgImage).CornerRadius = UDim.new(0, 10)
 
--- Dark overlay for readability on top of the image
 local BgOverlay = Instance.new("Frame")
-BgOverlay.Name = "BackgroundOverlay"
 BgOverlay.Size = UDim2.new(1, 0, 1, 0)
-BgOverlay.Position = UDim2.new(0, 0, 0, 0)
 BgOverlay.BackgroundColor3 = Color3.fromRGB(10, 5, 18)
 BgOverlay.BackgroundTransparency = 0.55
 BgOverlay.BorderSizePixel = 0
@@ -87,7 +81,6 @@ BgOverlay.ZIndex = 0
 BgOverlay.Parent = Main
 Instance.new("UICorner", BgOverlay).CornerRadius = UDim.new(0, 10)
 
--- ============ TITLE BAR ============
 local TitleBar = Instance.new("Frame")
 TitleBar.Size = UDim2.new(1, 0, 0, 34)
 TitleBar.BackgroundColor3 = Color3.fromRGB(30, 15, 45)
@@ -127,7 +120,6 @@ BtnRow.Parent = TitleBar
 
 local ToggleBtn = Instance.new("TextButton")
 ToggleBtn.Size = UDim2.new(0, 24, 0, 24)
-ToggleBtn.Position = UDim2.new(0, 0, 0, 0)
 ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 25, 70)
 ToggleBtn.BackgroundTransparency = 0
 ToggleBtn.Text = "–"
@@ -153,12 +145,8 @@ CloseBtn.ZIndex = 4
 CloseBtn.Parent = BtnRow
 Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
 
--- ============ DRAG HELPERS ============
 local function makeDraggable(button, onTap)
-    local dragging  = false
-    local moved     = false
-    local dragStart = nil
-    local startPos  = nil
+    local dragging, moved, dragStart, startPos = false, false, nil, nil
     local function clampToViewport(pos)
         local vp = Camera.ViewportSize
         local size = button.AbsoluteSize
@@ -286,21 +274,21 @@ do
     end))
 end
 
--- ============ TABS (back on TOP-LEFT of the body) ============
-local TabsBar = Instance.new("Frame")
-TabsBar.Size = UDim2.new(0, 180, 0, 28)          -- narrow bar hugging the left
-TabsBar.Position = UDim2.new(0, 10, 0, 42)
-TabsBar.BackgroundColor3 = Color3.fromRGB(25, 15, 35)
-TabsBar.BackgroundTransparency = 0.15
-TabsBar.BorderSizePixel = 0
-TabsBar.ZIndex = 2
-TabsBar.Parent = Main
-Instance.new("UICorner", TabsBar).CornerRadius = UDim.new(0, 6)
+-- LEFT RAIL TABS
+local TabsRail = Instance.new("Frame")
+TabsRail.Size = UDim2.new(0, 80, 1, -46)
+TabsRail.Position = UDim2.new(0, 6, 0, 40)
+TabsRail.BackgroundColor3 = Color3.fromRGB(20, 12, 30)
+TabsRail.BackgroundTransparency = 0.2
+TabsRail.BorderSizePixel = 0
+TabsRail.ZIndex = 2
+TabsRail.Parent = Main
+Instance.new("UICorner", TabsRail).CornerRadius = UDim.new(0, 8)
 
-local function makeTab(name, order, total)
+local function makeSideTab(name, order, total)
     local tab = Instance.new("TextButton")
-    tab.Size = UDim2.new(1/total, -2, 1, -4)
-    tab.Position = UDim2.new((order-1)/total, 1, 0, 2)
+    tab.Size = UDim2.new(1, -8, 0, 32)
+    tab.Position = UDim2.new(0, 4, 0, 6 + (order - 1) * 36)
     tab.BackgroundColor3 = Color3.fromRGB(40, 20, 60)
     tab.BackgroundTransparency = 0.15
     tab.Text = name
@@ -309,16 +297,16 @@ local function makeTab(name, order, total)
     tab.TextSize = 12
     tab.BorderSizePixel = 0
     tab.ZIndex = 3
-    tab.Parent = TabsBar
-    Instance.new("UICorner", tab).CornerRadius = UDim.new(0, 5)
+    tab.Parent = TabsRail
+    Instance.new("UICorner", tab).CornerRadius = UDim.new(0, 6)
     return tab
 end
-local AimTabBtn = makeTab("Aimbot", 1, 2)
-local EspTabBtn = makeTab("ESP", 2, 2)
+local AimTabBtn = makeSideTab("Aimbot", 1, 2)
+local EspTabBtn = makeSideTab("ESP", 2, 2)
 
 local Body = Instance.new("Frame")
-Body.Size = UDim2.new(1, -20, 1, -116)
-Body.Position = UDim2.new(0, 10, 0, 76)
+Body.Size = UDim2.new(1, -102, 1, -52)
+Body.Position = UDim2.new(0, 92, 0, 40)
 Body.BackgroundTransparency = 1
 Body.ZIndex = 2
 Body.Parent = Main
@@ -362,7 +350,7 @@ track(EspTabBtn.MouseButton1Click:Connect(function() setActiveTab("esp") end))
 -- ============ WIDGETS ============
 local function makeToggle(parent, text, yPos, default, callback)
     local Btn = Instance.new("TextButton")
-    Btn.Size = UDim2.new(1, -6, 0, 32)
+    Btn.Size = UDim2.new(1, -6, 0, 28)
     Btn.Position = UDim2.new(0, 3, 0, yPos)
     Btn.BackgroundColor3 = Color3.fromRGB(35, 20, 50)
     Btn.BackgroundTransparency = 0.15
@@ -386,8 +374,8 @@ local function makeToggle(parent, text, yPos, default, callback)
     Lbl.Parent = Btn
 
     local Pill = Instance.new("Frame")
-    Pill.Size = UDim2.new(0, 40, 0, 20)
-    Pill.Position = UDim2.new(1, -50, 0.5, -10)
+    Pill.Size = UDim2.new(0, 38, 0, 18)
+    Pill.Position = UDim2.new(1, -46, 0.5, -9)
     Pill.BackgroundColor3 = default and Color3.fromRGB(150, 70, 220) or Color3.fromRGB(60, 40, 80)
     Pill.BackgroundTransparency = 0
     Pill.BorderSizePixel = 0
@@ -396,8 +384,8 @@ local function makeToggle(parent, text, yPos, default, callback)
     Instance.new("UICorner", Pill).CornerRadius = UDim.new(1, 0)
 
     local Knob = Instance.new("Frame")
-    Knob.Size = UDim2.new(0, 16, 0, 16)
-    Knob.Position = default and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
+    Knob.Size = UDim2.new(0, 14, 0, 14)
+    Knob.Position = default and UDim2.new(1, -16, 0.5, -7) or UDim2.new(0, 2, 0.5, -7)
     Knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     Knob.BackgroundTransparency = 0
     Knob.BorderSizePixel = 0
@@ -409,7 +397,7 @@ local function makeToggle(parent, text, yPos, default, callback)
     track(Btn.MouseButton1Click:Connect(function()
         state = not state
         Pill.BackgroundColor3 = state and Color3.fromRGB(150, 70, 220) or Color3.fromRGB(60, 40, 80)
-        Knob.Position = state and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
+        Knob.Position = state and UDim2.new(1, -16, 0.5, -7) or UDim2.new(0, 2, 0.5, -7)
         callback(state)
     end))
     return Btn
@@ -417,7 +405,7 @@ end
 
 local function makeSwitch(parent, text, yPos, options, default, callback)
     local Frame = Instance.new("Frame")
-    Frame.Size = UDim2.new(1, -6, 0, 32)
+    Frame.Size = UDim2.new(1, -6, 0, 28)
     Frame.Position = UDim2.new(0, 3, 0, yPos)
     Frame.BackgroundColor3 = Color3.fromRGB(35, 20, 50)
     Frame.BackgroundTransparency = 0.15
@@ -427,20 +415,20 @@ local function makeSwitch(parent, text, yPos, options, default, callback)
     Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 6)
 
     local Lbl = Instance.new("TextLabel")
-    Lbl.Size = UDim2.new(0, 100, 1, 0)
+    Lbl.Size = UDim2.new(0, 70, 1, 0)
     Lbl.Position = UDim2.new(0, 12, 0, 0)
     Lbl.BackgroundTransparency = 1
     Lbl.Text = text
     Lbl.TextColor3 = Color3.fromRGB(230, 200, 255)
     Lbl.Font = Enum.Font.Gotham
-    Lbl.TextSize = 13
+    Lbl.TextSize = 12
     Lbl.TextXAlignment = Enum.TextXAlignment.Left
     Lbl.ZIndex = 4
     Lbl.Parent = Frame
 
     local Container = Instance.new("Frame")
-    Container.Size = UDim2.new(0, 200, 0, 22)
-    Container.Position = UDim2.new(1, -208, 0.5, -11)
+    Container.Size = UDim2.new(0, 180, 0, 20)
+    Container.Position = UDim2.new(1, -186, 0.5, -10)
     Container.BackgroundColor3 = Color3.fromRGB(20, 12, 30)
     Container.BackgroundTransparency = 0.15
     Container.BorderSizePixel = 0
@@ -477,14 +465,14 @@ end
 
 local function makeSlider(parent, text, yPos, min, max, default, callback)
     local Frame = Instance.new("Frame")
-    Frame.Size = UDim2.new(1, -6, 0, 44)
+    Frame.Size = UDim2.new(1, -6, 0, 36)
     Frame.Position = UDim2.new(0, 3, 0, yPos)
     Frame.BackgroundTransparency = 1
     Frame.ZIndex = 3
     Frame.Parent = parent
 
     local Lbl = Instance.new("TextLabel")
-    Lbl.Size = UDim2.new(1, 0, 0, 18)
+    Lbl.Size = UDim2.new(1, 0, 0, 16)
     Lbl.BackgroundTransparency = 1
     Lbl.Text = text .. ": " .. default
     Lbl.TextColor3 = Color3.fromRGB(230, 200, 255)
@@ -495,14 +483,14 @@ local function makeSlider(parent, text, yPos, min, max, default, callback)
     Lbl.Parent = Frame
 
     local Bar = Instance.new("Frame")
-    Bar.Size = UDim2.new(1, 0, 0, 14)
-    Bar.Position = UDim2.new(0, 0, 0, 22)
+    Bar.Size = UDim2.new(1, 0, 0, 12)
+    Bar.Position = UDim2.new(0, 0, 0, 18)
     Bar.BackgroundColor3 = Color3.fromRGB(35, 20, 50)
     Bar.BackgroundTransparency = 0.15
     Bar.BorderSizePixel = 0
     Bar.ZIndex = 4
     Bar.Parent = Frame
-    Instance.new("UICorner", Bar).CornerRadius = UDim.new(0, 7)
+    Instance.new("UICorner", Bar).CornerRadius = UDim.new(0, 6)
 
     local Fill = Instance.new("Frame")
     Fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
@@ -511,7 +499,7 @@ local function makeSlider(parent, text, yPos, min, max, default, callback)
     Fill.BorderSizePixel = 0
     Fill.ZIndex = 5
     Fill.Parent = Bar
-    Instance.new("UICorner", Fill).CornerRadius = UDim.new(0, 7)
+    Instance.new("UICorner", Fill).CornerRadius = UDim.new(0, 6)
 
     local dragging = false
     track(Bar.InputBegan:Connect(function(i)
@@ -536,32 +524,29 @@ local function makeSlider(parent, text, yPos, min, max, default, callback)
     return Frame
 end
 
--- ============ AIMBOT PAGE ============
 local ay = 4
 makeToggle(AimPage, "Aimbot Enabled", ay, Config.Aimbot.Enabled, function(v)
-    Config.Aimbot.Enabled = v
-    refreshAimPill()
-end); ay = ay + 36
-makeSwitch(AimPage, "Target:", ay, {"Head", "Torso"}, Config.Aimbot.TargetPart, function(v) Config.Aimbot.TargetPart = v end); ay = ay + 36
-makeSwitch(AimPage, "Lock Mode:", ay, {"Hold Mouse", "Always"}, Config.Aimbot.LockMode, function(v) Config.Aimbot.LockMode = v end); ay = ay + 36
-makeToggle(AimPage, "Team Check", ay, Config.Aimbot.TeamCheck, function(v) Config.Aimbot.TeamCheck = v end); ay = ay + 36
-makeSlider(AimPage, "FOV", ay, 30, 500, Config.Aimbot.FOV, function(v) Config.Aimbot.FOV = v end); ay = ay + 48
-makeSlider(AimPage, "Smoothness (1 soft - 100 hard)", ay, 1, 100, Config.Aimbot.Smoothness, function(v) Config.Aimbot.Smoothness = v end); ay = ay + 48
+    Config.Aimbot.Enabled = v; refreshAimPill()
+end); ay = ay + 32
+makeSwitch(AimPage, "Target:", ay, {"Head", "Torso"}, Config.Aimbot.TargetPart, function(v) Config.Aimbot.TargetPart = v end); ay = ay + 32
+makeSwitch(AimPage, "Lock Mode:", ay, {"Hold Mouse", "Always"}, Config.Aimbot.LockMode, function(v) Config.Aimbot.LockMode = v end); ay = ay + 32
+makeToggle(AimPage, "Team Check", ay, Config.Aimbot.TeamCheck, function(v) Config.Aimbot.TeamCheck = v end); ay = ay + 32
+makeSlider(AimPage, "FOV", ay, 30, 500, Config.Aimbot.FOV, function(v) Config.Aimbot.FOV = v end); ay = ay + 40
+makeSlider(AimPage, "Smoothness (1 soft - 100 hard)", ay, 1, 100, Config.Aimbot.Smoothness, function(v) Config.Aimbot.Smoothness = v end); ay = ay + 40
 AimPage.CanvasSize = UDim2.new(0, 0, 0, ay + 6)
 
--- ============ ESP PAGE ============
 local ey = 4
-makeToggle(EspPage, "ESP Enabled", ey, Config.ESP.Enabled, function(v) Config.ESP.Enabled = v end); ey = ey + 36
-makeToggle(EspPage, "Show Name", ey, Config.ESP.ShowName, function(v) Config.ESP.ShowName = v end); ey = ey + 36
-makeToggle(EspPage, "Show Distance", ey, Config.ESP.ShowDistance, function(v) Config.ESP.ShowDistance = v end); ey = ey + 36
-makeToggle(EspPage, "Show Health", ey, Config.ESP.ShowHealth, function(v) Config.ESP.ShowHealth = v end); ey = ey + 36
-makeToggle(EspPage, "Show Box", ey, Config.ESP.ShowBox, function(v) Config.ESP.ShowBox = v end); ey = ey + 36
-makeToggle(EspPage, "Team Check", ey, Config.ESP.TeamCheck, function(v) Config.ESP.TeamCheck = v end); ey = ey + 36
+makeToggle(EspPage, "ESP Enabled", ey, Config.ESP.Enabled, function(v) Config.ESP.Enabled = v end); ey = ey + 32
+makeToggle(EspPage, "Show Name", ey, Config.ESP.ShowName, function(v) Config.ESP.ShowName = v end); ey = ey + 32
+makeToggle(EspPage, "Show Distance", ey, Config.ESP.ShowDistance, function(v) Config.ESP.ShowDistance = v end); ey = ey + 32
+makeToggle(EspPage, "Show Health", ey, Config.ESP.ShowHealth, function(v) Config.ESP.ShowHealth = v end); ey = ey + 32
+makeToggle(EspPage, "Show Box", ey, Config.ESP.ShowBox, function(v) Config.ESP.ShowBox = v end); ey = ey + 32
+makeToggle(EspPage, "Team Check", ey, Config.ESP.TeamCheck, function(v) Config.ESP.TeamCheck = v end); ey = ey + 32
 EspPage.CanvasSize = UDim2.new(0, 0, 0, ey + 6)
 
 local Credit = Instance.new("TextLabel")
-Credit.Size = UDim2.new(1, 0, 0, 18)
-Credit.Position = UDim2.new(0, 0, 1, -20)
+Credit.Size = UDim2.new(1, 0, 0, 16)
+Credit.Position = UDim2.new(0, 0, 1, -18)
 Credit.BackgroundTransparency = 1
 Credit.Text = "Made by Omar"
 Credit.TextColor3 = Color3.fromRGB(180, 100, 240)
@@ -637,7 +622,13 @@ local function isTeammate(player)
     return a == b
 end
 
-local function isAliveHumanoid(hum) return hum and hum.Health > 0 end
+-- Strict alive check — returns the humanoid only if it's alive AND has a rig
+local function getAliveHumanoid(char)
+    if not char or not char.Parent then return nil end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum or hum.Health <= 0 then return nil end
+    return hum
+end
 
 local function hasValidRig(model)
     if not model or not model.Parent then return false end
@@ -673,14 +664,16 @@ local function hasLineOfSight(targetPart)
     return hit == nil
 end
 
+-- Collect player targets with EXPLICIT team check
 local function getPlayerTargets(useTeamCheck)
     local out = {}
     for _, player in ipairs(Players:GetPlayers()) do
         if player == LocalPlayer then continue end
         local char = player.Character
         if not char or not char.Parent then continue end
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        if not isAliveHumanoid(hum) then continue end
+        -- STRICT: skip dead humans first
+        local hum = getAliveHumanoid(char)
+        if not hum then continue end
         if useTeamCheck and isTeammate(player) then continue end
         if not hasValidRig(char) then continue end
         out[#out + 1] = {
@@ -719,8 +712,8 @@ local function getNpcTargets()
     local out = {}
     for _, model in ipairs(npcCache) do
         if not model.Parent then continue end
-        local hum = model:FindFirstChildOfClass("Humanoid")
-        if not isAliveHumanoid(hum) then continue end
+        local hum = getAliveHumanoid(model)
+        if not hum then continue end
         if not hasValidRig(model) then continue end
         out[#out + 1] = {
             character = model, humanoid = hum, player = nil,
@@ -802,9 +795,11 @@ local function drawESP(t)
     local char = t.character
     if not espObjects[char] then createESP(char) end
     local d = espObjects[char]
+    -- STRICT alive check — if dead, hide everything
+    local hum = getAliveHumanoid(char)
     local hrp  = char:FindFirstChild("HumanoidRootPart")
     local head = char:FindFirstChild("Head")
-    if not (hrp and head) then setAllVisible(d, false); return end
+    if not (hum and hrp and head) then setAllVisible(d, false); return end
 
     local headPos, onScreen = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
     local rootPos = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3, 0))
@@ -852,7 +847,7 @@ local function drawESP(t)
     else d.Distance.Visible = false end
 
     if Config.ESP.ShowHealth then
-        local hpPct = math.clamp(t.humanoid.Health / t.humanoid.MaxHealth, 0, 1)
+        local hpPct = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
         local barH = boxSize.Y
         local barX = bottomRight.X + 4
         d.HPBg.Visible = true; d.HPBg.Size = Vector2.new(4, barH); d.HPBg.Position = Vector2.new(barX, topLeft.Y)
@@ -931,12 +926,14 @@ local AIMBOT_BIND_NAME = "OmarHubAimbot"
 local bound = false
 local currentTarget = nil
 
+-- STRICT target validation, includes team check for instant drop of teammates
 local function targetIsValid(part)
     if not part or not part.Parent then return false end
     if not part:IsDescendantOf(Workspace) then return false end
     local char = part.Parent
-    local hum = char and char:FindFirstChildOfClass("Humanoid")
-    if not (hum and hum.Health > 0) then return false end
+    local hum = getAliveHumanoid(char)
+    if not hum then return false end
+    -- Team check: if enabled and target is a teammate player → invalid immediately
     if Config.Aimbot.TeamCheck then
         local plr = Players:GetPlayerFromCharacter(char)
         if plr and isTeammate(plr) then return false end
@@ -966,6 +963,7 @@ local function aimStep()
 
     local gated = (Config.Aimbot.LockMode == "Hold Mouse") and not mouseHeld
 
+    -- Re-validate target every frame. If it's a teammate now, drop it.
     if not targetIsValid(currentTarget) then
         currentTarget = nil
     end
