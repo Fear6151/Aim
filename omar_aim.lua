@@ -1,7 +1,7 @@
 --[[
-    Omar Hub 
+    Omar Hub
     Credit: Made by Omar
- 
+    
 --]]
 
 local Players          = game:GetService("Players")
@@ -47,11 +47,13 @@ ScreenGui.DisplayOrder = 999
 ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local Main = Instance.new("Frame")
-Main.Size = UDim2.new(0, 360, 0, 440)          -- wider + taller
-Main.Position = UDim2.new(0.5, -180, 0.5, -220)
+Main.Size = UDim2.new(0, 420, 0, 400)
+Main.Position = UDim2.new(0.5, -210, 0.5, -200)
 Main.BackgroundColor3 = Color3.fromRGB(15, 10, 20)
+Main.BackgroundTransparency = 0
 Main.BorderSizePixel = 0
 Main.Active = false
+Main.ClipsDescendants = true           -- keeps the background image inside the frame
 Main.Parent = ScreenGui
 Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 10)
 
@@ -60,10 +62,38 @@ Stroke.Color = Color3.fromRGB(140, 60, 220)
 Stroke.Thickness = 1.5
 Stroke.Transparency = 0.15
 
+-- ============ BACKGROUND IMAGE ============
+local BgImage = Instance.new("ImageLabel")
+BgImage.Name = "Background"
+BgImage.Size = UDim2.new(1, 0, 1, 0)
+BgImage.Position = UDim2.new(0, 0, 0, 0)
+BgImage.BackgroundTransparency = 1
+BgImage.Image = "rbxassetid://78398641131333"
+BgImage.ImageTransparency = 0.35          -- dim so text stays readable
+BgImage.ScaleType = Enum.ScaleType.Crop
+BgImage.ZIndex = 0
+BgImage.Parent = Main
+Instance.new("UICorner", BgImage).CornerRadius = UDim.new(0, 10)
+
+-- Dark overlay for readability on top of the image
+local BgOverlay = Instance.new("Frame")
+BgOverlay.Name = "BackgroundOverlay"
+BgOverlay.Size = UDim2.new(1, 0, 1, 0)
+BgOverlay.Position = UDim2.new(0, 0, 0, 0)
+BgOverlay.BackgroundColor3 = Color3.fromRGB(10, 5, 18)
+BgOverlay.BackgroundTransparency = 0.55
+BgOverlay.BorderSizePixel = 0
+BgOverlay.ZIndex = 0
+BgOverlay.Parent = Main
+Instance.new("UICorner", BgOverlay).CornerRadius = UDim.new(0, 10)
+
+-- ============ TITLE BAR ============
 local TitleBar = Instance.new("Frame")
 TitleBar.Size = UDim2.new(1, 0, 0, 34)
 TitleBar.BackgroundColor3 = Color3.fromRGB(30, 15, 45)
+TitleBar.BackgroundTransparency = 0.15
 TitleBar.BorderSizePixel = 0
+TitleBar.ZIndex = 2
 TitleBar.Parent = Main
 Instance.new("UICorner", TitleBar).CornerRadius = UDim.new(0, 10)
 
@@ -72,6 +102,7 @@ DragHandle.Size = UDim2.new(0, 60, 0, 4)
 DragHandle.Position = UDim2.new(0.5, -30, 0, 4)
 DragHandle.BackgroundColor3 = Color3.fromRGB(150, 90, 230)
 DragHandle.BorderSizePixel = 0
+DragHandle.ZIndex = 3
 DragHandle.Parent = TitleBar
 Instance.new("UICorner", DragHandle).CornerRadius = UDim.new(1, 0)
 
@@ -84,22 +115,27 @@ Title.TextColor3 = Color3.fromRGB(200, 130, 255)
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 14
 Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.ZIndex = 3
 Title.Parent = TitleBar
 
 local BtnRow = Instance.new("Frame")
 BtnRow.Size = UDim2.new(0, 54, 0, 24)
 BtnRow.Position = UDim2.new(1, -60, 0.5, -12)
 BtnRow.BackgroundTransparency = 1
+BtnRow.ZIndex = 3
 BtnRow.Parent = TitleBar
 
 local ToggleBtn = Instance.new("TextButton")
 ToggleBtn.Size = UDim2.new(0, 24, 0, 24)
+ToggleBtn.Position = UDim2.new(0, 0, 0, 0)
 ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 25, 70)
+ToggleBtn.BackgroundTransparency = 0
 ToggleBtn.Text = "–"
 ToggleBtn.TextColor3 = Color3.fromRGB(220, 180, 255)
 ToggleBtn.Font = Enum.Font.GothamBold
 ToggleBtn.TextSize = 15
 ToggleBtn.BorderSizePixel = 0
+ToggleBtn.ZIndex = 4
 ToggleBtn.Parent = BtnRow
 Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(0, 6)
 
@@ -107,14 +143,17 @@ local CloseBtn = Instance.new("TextButton")
 CloseBtn.Size = UDim2.new(0, 24, 0, 24)
 CloseBtn.Position = UDim2.new(0, 30, 0, 0)
 CloseBtn.BackgroundColor3 = Color3.fromRGB(70, 20, 40)
+CloseBtn.BackgroundTransparency = 0
 CloseBtn.Text = "X"
 CloseBtn.TextColor3 = Color3.fromRGB(255, 150, 180)
 CloseBtn.Font = Enum.Font.GothamBold
 CloseBtn.TextSize = 13
 CloseBtn.BorderSizePixel = 0
+CloseBtn.ZIndex = 4
 CloseBtn.Parent = BtnRow
 Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
 
+-- ============ DRAG HELPERS ============
 local function makeDraggable(button, onTap)
     local dragging  = false
     local moved     = false
@@ -159,6 +198,7 @@ local FloatPill = Instance.new("TextButton")
 FloatPill.Size = UDim2.new(0, 72, 0, 28)
 FloatPill.Position = UDim2.new(0, 14, 1, -80)
 FloatPill.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+FloatPill.BackgroundTransparency = 0
 FloatPill.Text = "OMAR"
 FloatPill.TextColor3 = Color3.fromRGB(180, 100, 240)
 FloatPill.Font = Enum.Font.GothamBold
@@ -178,6 +218,7 @@ local AimPill = Instance.new("TextButton")
 AimPill.Size = UDim2.new(0, 72, 0, 28)
 AimPill.Position = UDim2.new(0, 14, 1, -46)
 AimPill.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+AimPill.BackgroundTransparency = 0
 AimPill.Text = "AIM: OFF"
 AimPill.TextColor3 = Color3.fromRGB(200, 90, 120)
 AimPill.Font = Enum.Font.GothamBold
@@ -245,11 +286,14 @@ do
     end))
 end
 
+-- ============ TABS (back on TOP-LEFT of the body) ============
 local TabsBar = Instance.new("Frame")
-TabsBar.Size = UDim2.new(1, -20, 0, 30)
-TabsBar.Position = UDim2.new(0, 10, 0, 40)
+TabsBar.Size = UDim2.new(0, 180, 0, 28)          -- narrow bar hugging the left
+TabsBar.Position = UDim2.new(0, 10, 0, 42)
 TabsBar.BackgroundColor3 = Color3.fromRGB(25, 15, 35)
+TabsBar.BackgroundTransparency = 0.15
 TabsBar.BorderSizePixel = 0
+TabsBar.ZIndex = 2
 TabsBar.Parent = Main
 Instance.new("UICorner", TabsBar).CornerRadius = UDim.new(0, 6)
 
@@ -258,11 +302,13 @@ local function makeTab(name, order, total)
     tab.Size = UDim2.new(1/total, -2, 1, -4)
     tab.Position = UDim2.new((order-1)/total, 1, 0, 2)
     tab.BackgroundColor3 = Color3.fromRGB(40, 20, 60)
+    tab.BackgroundTransparency = 0.15
     tab.Text = name
     tab.TextColor3 = Color3.fromRGB(220, 190, 255)
     tab.Font = Enum.Font.GothamBold
     tab.TextSize = 12
     tab.BorderSizePixel = 0
+    tab.ZIndex = 3
     tab.Parent = TabsBar
     Instance.new("UICorner", tab).CornerRadius = UDim.new(0, 5)
     return tab
@@ -274,6 +320,7 @@ local Body = Instance.new("Frame")
 Body.Size = UDim2.new(1, -20, 1, -116)
 Body.Position = UDim2.new(0, 10, 0, 76)
 Body.BackgroundTransparency = 1
+Body.ZIndex = 2
 Body.Parent = Main
 
 local AimPage = Instance.new("ScrollingFrame")
@@ -283,6 +330,7 @@ AimPage.BorderSizePixel = 0
 AimPage.ScrollBarThickness = 3
 AimPage.ScrollBarImageColor3 = Color3.fromRGB(140, 60, 220)
 AimPage.CanvasSize = UDim2.new(0, 0, 0, 300)
+AimPage.ZIndex = 3
 AimPage.Parent = Body
 
 local EspPage = Instance.new("ScrollingFrame")
@@ -293,6 +341,7 @@ EspPage.ScrollBarThickness = 3
 EspPage.ScrollBarImageColor3 = Color3.fromRGB(140, 60, 220)
 EspPage.CanvasSize = UDim2.new(0, 0, 0, 240)
 EspPage.Visible = false
+EspPage.ZIndex = 3
 EspPage.Parent = Body
 
 local function setActiveTab(which)
@@ -316,9 +365,11 @@ local function makeToggle(parent, text, yPos, default, callback)
     Btn.Size = UDim2.new(1, -6, 0, 32)
     Btn.Position = UDim2.new(0, 3, 0, yPos)
     Btn.BackgroundColor3 = Color3.fromRGB(35, 20, 50)
+    Btn.BackgroundTransparency = 0.15
     Btn.Text = ""
     Btn.BorderSizePixel = 0
     Btn.AutoButtonColor = false
+    Btn.ZIndex = 3
     Btn.Parent = parent
     Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 6)
 
@@ -331,13 +382,16 @@ local function makeToggle(parent, text, yPos, default, callback)
     Lbl.Font = Enum.Font.Gotham
     Lbl.TextSize = 13
     Lbl.TextXAlignment = Enum.TextXAlignment.Left
+    Lbl.ZIndex = 4
     Lbl.Parent = Btn
 
     local Pill = Instance.new("Frame")
     Pill.Size = UDim2.new(0, 40, 0, 20)
     Pill.Position = UDim2.new(1, -50, 0.5, -10)
     Pill.BackgroundColor3 = default and Color3.fromRGB(150, 70, 220) or Color3.fromRGB(60, 40, 80)
+    Pill.BackgroundTransparency = 0
     Pill.BorderSizePixel = 0
+    Pill.ZIndex = 4
     Pill.Parent = Btn
     Instance.new("UICorner", Pill).CornerRadius = UDim.new(1, 0)
 
@@ -345,7 +399,9 @@ local function makeToggle(parent, text, yPos, default, callback)
     Knob.Size = UDim2.new(0, 16, 0, 16)
     Knob.Position = default and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
     Knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    Knob.BackgroundTransparency = 0
     Knob.BorderSizePixel = 0
+    Knob.ZIndex = 5
     Knob.Parent = Pill
     Instance.new("UICorner", Knob).CornerRadius = UDim.new(1, 0)
 
@@ -364,7 +420,9 @@ local function makeSwitch(parent, text, yPos, options, default, callback)
     Frame.Size = UDim2.new(1, -6, 0, 32)
     Frame.Position = UDim2.new(0, 3, 0, yPos)
     Frame.BackgroundColor3 = Color3.fromRGB(35, 20, 50)
+    Frame.BackgroundTransparency = 0.15
     Frame.BorderSizePixel = 0
+    Frame.ZIndex = 3
     Frame.Parent = parent
     Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 6)
 
@@ -377,13 +435,16 @@ local function makeSwitch(parent, text, yPos, options, default, callback)
     Lbl.Font = Enum.Font.Gotham
     Lbl.TextSize = 13
     Lbl.TextXAlignment = Enum.TextXAlignment.Left
+    Lbl.ZIndex = 4
     Lbl.Parent = Frame
 
     local Container = Instance.new("Frame")
-    Container.Size = UDim2.new(0, 170, 0, 22)
-    Container.Position = UDim2.new(1, -178, 0.5, -11)
+    Container.Size = UDim2.new(0, 200, 0, 22)
+    Container.Position = UDim2.new(1, -208, 0.5, -11)
     Container.BackgroundColor3 = Color3.fromRGB(20, 12, 30)
+    Container.BackgroundTransparency = 0.15
     Container.BorderSizePixel = 0
+    Container.ZIndex = 4
     Container.Parent = Frame
     Instance.new("UICorner", Container).CornerRadius = UDim.new(0, 5)
 
@@ -392,11 +453,13 @@ local function makeSwitch(parent, text, yPos, options, default, callback)
         b.Size = UDim2.new(1/#options, -2, 1, -4)
         b.Position = UDim2.new((i-1)/#options, 1, 0, 2)
         b.BackgroundColor3 = (opt == default) and Color3.fromRGB(150, 70, 220) or Color3.fromRGB(50, 30, 70)
+        b.BackgroundTransparency = 0
         b.Text = opt
         b.TextColor3 = Color3.fromRGB(240, 220, 255)
         b.Font = Enum.Font.GothamBold
         b.TextSize = 11
         b.BorderSizePixel = 0
+        b.ZIndex = 5
         b.Parent = Container
         Instance.new("UICorner", b).CornerRadius = UDim.new(0, 4)
         track(b.MouseButton1Click:Connect(function()
@@ -417,6 +480,7 @@ local function makeSlider(parent, text, yPos, min, max, default, callback)
     Frame.Size = UDim2.new(1, -6, 0, 44)
     Frame.Position = UDim2.new(0, 3, 0, yPos)
     Frame.BackgroundTransparency = 1
+    Frame.ZIndex = 3
     Frame.Parent = parent
 
     local Lbl = Instance.new("TextLabel")
@@ -427,20 +491,25 @@ local function makeSlider(parent, text, yPos, min, max, default, callback)
     Lbl.Font = Enum.Font.Gotham
     Lbl.TextSize = 12
     Lbl.TextXAlignment = Enum.TextXAlignment.Left
+    Lbl.ZIndex = 4
     Lbl.Parent = Frame
 
     local Bar = Instance.new("Frame")
     Bar.Size = UDim2.new(1, 0, 0, 14)
     Bar.Position = UDim2.new(0, 0, 0, 22)
     Bar.BackgroundColor3 = Color3.fromRGB(35, 20, 50)
+    Bar.BackgroundTransparency = 0.15
     Bar.BorderSizePixel = 0
+    Bar.ZIndex = 4
     Bar.Parent = Frame
     Instance.new("UICorner", Bar).CornerRadius = UDim.new(0, 7)
 
     local Fill = Instance.new("Frame")
     Fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
     Fill.BackgroundColor3 = Color3.fromRGB(150, 70, 220)
+    Fill.BackgroundTransparency = 0
     Fill.BorderSizePixel = 0
+    Fill.ZIndex = 5
     Fill.Parent = Bar
     Instance.new("UICorner", Fill).CornerRadius = UDim.new(0, 7)
 
@@ -498,6 +567,7 @@ Credit.Text = "Made by Omar"
 Credit.TextColor3 = Color3.fromRGB(180, 100, 240)
 Credit.Font = Enum.Font.GothamBold
 Credit.TextSize = 12
+Credit.ZIndex = 3
 Credit.Parent = Main
 
 -- ============ FOV RING ============
@@ -603,8 +673,6 @@ local function hasLineOfSight(targetPart)
     return hit == nil
 end
 
--- getPlayerTargets now takes the teamCheck setting EXPLICITLY
--- so ESP and Aimbot can have independent checks
 local function getPlayerTargets(useTeamCheck)
     local out = {}
     for _, player in ipairs(Players:GetPlayers()) do
@@ -666,7 +734,8 @@ end
 local espObjects = {}
 
 local function createESP(character)
-    if espObjects[character] then return end    local d = {
+    if espObjects[character] then return end
+    local d = {
         Box = Drawing.new("Square"),
         TL = Drawing.new("Line"), TR = Drawing.new("Line"),
         BL = Drawing.new("Line"), BR = Drawing.new("Line"),
@@ -814,8 +883,6 @@ track(UserInputService.InputEnded:Connect(function(input)
 end))
 
 -- ============ AIMBOT ============
--- Uses Config.Aimbot.TeamCheck for the team filter (independent of ESP).
--- Wall check is always active (no toggle).
 local function findBestTarget()
     local vp = Camera.ViewportSize
     local center = Vector2.new(vp.X / 2, vp.Y / 2)
@@ -823,7 +890,6 @@ local function findBestTarget()
     local bestPlayer, bestPlayerDist = nil, math.huge
     local bestNpc,    bestNpcDist    = nil, math.huge
 
-    -- Players — respecting Aimbot.TeamCheck
     for _, t in ipairs(getPlayerTargets(Config.Aimbot.TeamCheck)) do
         local part = getTargetPart(t.character)
         if part then
@@ -842,7 +908,6 @@ local function findBestTarget()
     end
     if bestPlayer then return bestPlayer end
 
-    -- NPCs as fallback
     for _, t in ipairs(getNpcTargets()) do
         local part = getTargetPart(t.character)
         if part then
@@ -872,14 +937,10 @@ local function targetIsValid(part)
     local char = part.Parent
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     if not (hum and hum.Health > 0) then return false end
-
-    -- If team check is on, immediately reject teammates even if we somehow have them cached
     if Config.Aimbot.TeamCheck then
         local plr = Players:GetPlayerFromCharacter(char)
         if plr and isTeammate(plr) then return false end
     end
-
-    -- Also drop the target the moment it walks behind a wall
     if not hasLineOfSight(part) then return false end
     return true
 end
@@ -905,7 +966,6 @@ local function aimStep()
 
     local gated = (Config.Aimbot.LockMode == "Hold Mouse") and not mouseHeld
 
-    -- Drop invalid, walled-off, or teammate target instantly
     if not targetIsValid(currentTarget) then
         currentTarget = nil
     end
@@ -1012,7 +1072,6 @@ end))
 refreshBinding()
 
 -- ============ ESP RENDER ============
--- Uses Config.ESP.TeamCheck for its own team filter (independent of aimbot)
 track(RunService.RenderStepped:Connect(function()
     if not Config.ESP.Enabled then
         for _, d in pairs(espObjects) do setAllVisible(d, false) end
