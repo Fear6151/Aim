@@ -1,7 +1,7 @@
 --[[
-    Omar Hub
+    Omar Hub 
     Credit: Made by Omar
-    
+ 
 --]]
 
 local Players          = game:GetService("Players")
@@ -47,8 +47,8 @@ ScreenGui.DisplayOrder = 999
 ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local Main = Instance.new("Frame")
-Main.Size = UDim2.new(0, 300, 0, 400)
-Main.Position = UDim2.new(0.5, -150, 0.5, -200)
+Main.Size = UDim2.new(0, 360, 0, 440)          -- wider + taller
+Main.Position = UDim2.new(0.5, -180, 0.5, -220)
 Main.BackgroundColor3 = Color3.fromRGB(15, 10, 20)
 Main.BorderSizePixel = 0
 Main.Active = false
@@ -369,7 +369,7 @@ local function makeSwitch(parent, text, yPos, options, default, callback)
     Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 6)
 
     local Lbl = Instance.new("TextLabel")
-    Lbl.Size = UDim2.new(0, 90, 1, 0)
+    Lbl.Size = UDim2.new(0, 100, 1, 0)
     Lbl.Position = UDim2.new(0, 12, 0, 0)
     Lbl.BackgroundTransparency = 1
     Lbl.Text = text
@@ -380,8 +380,8 @@ local function makeSwitch(parent, text, yPos, options, default, callback)
     Lbl.Parent = Frame
 
     local Container = Instance.new("Frame")
-    Container.Size = UDim2.new(0, 140, 0, 22)
-    Container.Position = UDim2.new(1, -148, 0.5, -11)
+    Container.Size = UDim2.new(0, 170, 0, 22)
+    Container.Position = UDim2.new(1, -178, 0.5, -11)
     Container.BackgroundColor3 = Color3.fromRGB(20, 12, 30)
     Container.BorderSizePixel = 0
     Container.Parent = Frame
@@ -506,6 +506,7 @@ FovRing.AnchorPoint = Vector2.new(0.5, 0.5)
 FovRing.BackgroundTransparency = 1
 FovRing.BorderSizePixel = 0
 FovRing.ZIndex = 1
+FovRing.Visible = false
 FovRing.Parent = ScreenGui
 Instance.new("UICorner", FovRing).CornerRadius = UDim.new(1, 0)
 
@@ -520,6 +521,7 @@ FovGlow.Position = UDim2.new(0.5, 0, 0.5, 0)
 FovGlow.BackgroundTransparency = 1
 FovGlow.BorderSizePixel = 0
 FovGlow.ZIndex = 0
+FovGlow.Visible = false
 FovGlow.Parent = ScreenGui
 Instance.new("UICorner", FovGlow).CornerRadius = UDim.new(1, 0)
 local FovStrokeInner = Instance.new("UIStroke", FovGlow)
@@ -534,6 +536,7 @@ CenterDot.Position = UDim2.new(0.5, 0, 0.5, 0)
 CenterDot.BackgroundColor3 = Color3.fromRGB(220, 140, 255)
 CenterDot.BorderSizePixel = 0
 CenterDot.ZIndex = 2
+CenterDot.Visible = false
 CenterDot.Parent = ScreenGui
 Instance.new("UICorner", CenterDot).CornerRadius = UDim.new(1, 0)
 local CenterStroke = Instance.new("UIStroke", CenterDot)
@@ -587,23 +590,22 @@ local function getTargetPart(char)
     return nil
 end
 
--- Wall check: returns true if I can see the target from my head
 local function hasLineOfSight(targetPart)
     if not targetPart then return false end
     local myChar = LocalPlayer.Character
     local myHead = myChar and myChar:FindFirstChild("Head")
     if not myHead then return true end
-
     local params = RaycastParams.new()
     params.FilterType = Enum.RaycastFilterType.Exclude
     params.FilterDescendantsInstances = { myChar, targetPart.Parent }
     params.IgnoreWater = true
-
     local hit = Workspace:Raycast(myHead.Position, targetPart.Position - myHead.Position, params)
     return hit == nil
 end
 
-local function getPlayerTargets()
+-- getPlayerTargets now takes the teamCheck setting EXPLICITLY
+-- so ESP and Aimbot can have independent checks
+local function getPlayerTargets(useTeamCheck)
     local out = {}
     for _, player in ipairs(Players:GetPlayers()) do
         if player == LocalPlayer then continue end
@@ -611,7 +613,7 @@ local function getPlayerTargets()
         if not char or not char.Parent then continue end
         local hum = char:FindFirstChildOfClass("Humanoid")
         if not isAliveHumanoid(hum) then continue end
-        if Config.Aimbot.TeamCheck and isTeammate(player) then continue end
+        if useTeamCheck and isTeammate(player) then continue end
         if not hasValidRig(char) then continue end
         out[#out + 1] = {
             character = char, humanoid = hum, player = player,
@@ -664,8 +666,7 @@ end
 local espObjects = {}
 
 local function createESP(character)
-    if espObjects[character] then return end
-    local d = {
+    if espObjects[character] then return end    local d = {
         Box = Drawing.new("Square"),
         TL = Drawing.new("Line"), TR = Drawing.new("Line"),
         BL = Drawing.new("Line"), BR = Drawing.new("Line"),
@@ -813,7 +814,8 @@ track(UserInputService.InputEnded:Connect(function(input)
 end))
 
 -- ============ AIMBOT ============
--- findBestTarget now ALWAYS skips anything behind a wall (no toggle)
+-- Uses Config.Aimbot.TeamCheck for the team filter (independent of ESP).
+-- Wall check is always active (no toggle).
 local function findBestTarget()
     local vp = Camera.ViewportSize
     local center = Vector2.new(vp.X / 2, vp.Y / 2)
@@ -821,21 +823,18 @@ local function findBestTarget()
     local bestPlayer, bestPlayerDist = nil, math.huge
     local bestNpc,    bestNpcDist    = nil, math.huge
 
-    -- Players first
-    for _, t in ipairs(getPlayerTargets()) do
+    -- Players — respecting Aimbot.TeamCheck
+    for _, t in ipairs(getPlayerTargets(Config.Aimbot.TeamCheck)) do
         local part = getTargetPart(t.character)
         if part then
             local dist = (origin - part.Position).Magnitude
-            if dist <= Config.Aimbot.MaxDist then
-                -- ALWAYS check walls, no toggle
-                if hasLineOfSight(part) then
-                    local sp, on = Camera:WorldToViewportPoint(part.Position)
-                    if on and sp.Z > 0 then
-                        local sd = (Vector2.new(sp.X, sp.Y) - center).Magnitude
-                        if sd <= Config.Aimbot.FOV and sd < bestPlayerDist then
-                            bestPlayerDist = sd
-                            bestPlayer = part
-                        end
+            if dist <= Config.Aimbot.MaxDist and hasLineOfSight(part) then
+                local sp, on = Camera:WorldToViewportPoint(part.Position)
+                if on and sp.Z > 0 then
+                    local sd = (Vector2.new(sp.X, sp.Y) - center).Magnitude
+                    if sd <= Config.Aimbot.FOV and sd < bestPlayerDist then
+                        bestPlayerDist = sd
+                        bestPlayer = part
                     end
                 end
             end
@@ -843,20 +842,18 @@ local function findBestTarget()
     end
     if bestPlayer then return bestPlayer end
 
-    -- NPCs only if no visible player
+    -- NPCs as fallback
     for _, t in ipairs(getNpcTargets()) do
         local part = getTargetPart(t.character)
         if part then
             local dist = (origin - part.Position).Magnitude
-            if dist <= Config.Aimbot.MaxDist then
-                if hasLineOfSight(part) then
-                    local sp, on = Camera:WorldToViewportPoint(part.Position)
-                    if on and sp.Z > 0 then
-                        local sd = (Vector2.new(sp.X, sp.Y) - center).Magnitude
-                        if sd <= Config.Aimbot.FOV and sd < bestNpcDist then
-                            bestNpcDist = sd
-                            bestNpc = part
-                        end
+            if dist <= Config.Aimbot.MaxDist and hasLineOfSight(part) then
+                local sp, on = Camera:WorldToViewportPoint(part.Position)
+                if on and sp.Z > 0 then
+                    local sd = (Vector2.new(sp.X, sp.Y) - center).Magnitude
+                    if sd <= Config.Aimbot.FOV and sd < bestNpcDist then
+                        bestNpcDist = sd
+                        bestNpc = part
                     end
                 end
             end
@@ -875,7 +872,14 @@ local function targetIsValid(part)
     local char = part.Parent
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     if not (hum and hum.Health > 0) then return false end
-    -- Also drop the target if it walks behind a wall
+
+    -- If team check is on, immediately reject teammates even if we somehow have them cached
+    if Config.Aimbot.TeamCheck then
+        local plr = Players:GetPlayerFromCharacter(char)
+        if plr and isTeammate(plr) then return false end
+    end
+
+    -- Also drop the target the moment it walks behind a wall
     if not hasLineOfSight(part) then return false end
     return true
 end
@@ -901,12 +905,11 @@ local function aimStep()
 
     local gated = (Config.Aimbot.LockMode == "Hold Mouse") and not mouseHeld
 
-    -- Invalid or walled-off target → drop
+    -- Drop invalid, walled-off, or teammate target instantly
     if not targetIsValid(currentTarget) then
         currentTarget = nil
     end
 
-    -- Out of FOV → drop
     if currentTarget then
         local sp, on = Camera:WorldToViewportPoint(currentTarget.Position)
         local vp = Camera.ViewportSize
@@ -1009,13 +1012,14 @@ end))
 refreshBinding()
 
 -- ============ ESP RENDER ============
+-- Uses Config.ESP.TeamCheck for its own team filter (independent of aimbot)
 track(RunService.RenderStepped:Connect(function()
     if not Config.ESP.Enabled then
         for _, d in pairs(espObjects) do setAllVisible(d, false) end
         return
     end
     local liveChars = {}
-    for _, t in ipairs(getPlayerTargets()) do
+    for _, t in ipairs(getPlayerTargets(Config.ESP.TeamCheck)) do
         liveChars[t.character] = true
         drawESP(t)
     end
