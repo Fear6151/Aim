@@ -1,8 +1,7 @@
 --[[
-    Omar Hub v35
+    Omar Hub
     Credit: Made by Omar
-    For use ONLY in your own Roblox game.
-    Based on v15 (confirmed working) + later QoL fixes, no silent aim.
+
 --]]
 
 local Players          = game:GetService("Players")
@@ -30,9 +29,10 @@ local Config = {
         TeamCheck  = true,
         MaxDist    = 1000,
         Smoothness = 100,
-        LockMode   = "Hold Mouse", -- "Hold Mouse" | "Always"
+        LockMode   = "Hold Mouse",
     },
     ToggleKey = Enum.KeyCode.RightShift,
+    BackgroundAssetId = "rbxassetid://78398641131333",
 }
 
 -- ============ STATE ============
@@ -49,13 +49,38 @@ ScreenGui.DisplayOrder = 999
 ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local Main = Instance.new("Frame")
-Main.Size = UDim2.new(0, 260, 0, 360)
-Main.Position = UDim2.new(0.5, -130, 0.5, -180)
+Main.Size = UDim2.new(0, 340, 0, 360)
+Main.Position = UDim2.new(0.5, -170, 0.5, -180)
 Main.BackgroundColor3 = Color3.fromRGB(15, 10, 20)
+Main.BackgroundTransparency = 0.15
 Main.BorderSizePixel = 0
 Main.Active = false
+Main.ClipsDescendants = true
 Main.Parent = ScreenGui
 Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 10)
+
+-- ---- Background image ----
+local BgImage = Instance.new("ImageLabel")
+BgImage.Name = "Background"
+BgImage.Size = UDim2.new(1, 0, 1, 0)
+BgImage.Position = UDim2.new(0, 0, 0, 0)
+BgImage.BackgroundTransparency = 1
+BgImage.Image = Config.BackgroundAssetId
+BgImage.ImageTransparency = 0.25
+BgImage.ScaleType = Enum.ScaleType.Crop
+BgImage.ZIndex = 0
+BgImage.Parent = Main
+
+-- Dark tint overlay so text stays readable on the background
+local BgTint = Instance.new("Frame")
+BgTint.Name = "BgTint"
+BgTint.Size = UDim2.new(1, 0, 1, 0)
+BgTint.BackgroundColor3 = Color3.fromRGB(10, 5, 15)
+BgTint.BackgroundTransparency = 0.55
+BgTint.BorderSizePixel = 0
+BgTint.ZIndex = 0
+BgTint.Parent = Main
+Instance.new("UICorner", BgTint).CornerRadius = UDim.new(0, 10)
 
 local Stroke = Instance.new("UIStroke", Main)
 Stroke.Color = Color3.fromRGB(140, 60, 220)
@@ -65,7 +90,9 @@ Stroke.Transparency = 0.15
 local TitleBar = Instance.new("Frame")
 TitleBar.Size = UDim2.new(1, 0, 0, 34)
 TitleBar.BackgroundColor3 = Color3.fromRGB(30, 15, 45)
+TitleBar.BackgroundTransparency = 0.15
 TitleBar.BorderSizePixel = 0
+TitleBar.ZIndex = 2
 TitleBar.Parent = Main
 Instance.new("UICorner", TitleBar).CornerRadius = UDim.new(0, 10)
 
@@ -74,6 +101,7 @@ DragHandle.Size = UDim2.new(0, 60, 0, 4)
 DragHandle.Position = UDim2.new(0.5, -30, 0, 4)
 DragHandle.BackgroundColor3 = Color3.fromRGB(150, 90, 230)
 DragHandle.BorderSizePixel = 0
+DragHandle.ZIndex = 3
 DragHandle.Parent = TitleBar
 Instance.new("UICorner", DragHandle).CornerRadius = UDim.new(1, 0)
 
@@ -86,12 +114,14 @@ Title.TextColor3 = Color3.fromRGB(200, 130, 255)
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 14
 Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.ZIndex = 3
 Title.Parent = TitleBar
 
 local BtnRow = Instance.new("Frame")
 BtnRow.Size = UDim2.new(0, 54, 0, 24)
 BtnRow.Position = UDim2.new(1, -60, 0.5, -12)
 BtnRow.BackgroundTransparency = 1
+BtnRow.ZIndex = 3
 BtnRow.Parent = TitleBar
 
 local ToggleBtn = Instance.new("TextButton")
@@ -102,6 +132,7 @@ ToggleBtn.TextColor3 = Color3.fromRGB(220, 180, 255)
 ToggleBtn.Font = Enum.Font.GothamBold
 ToggleBtn.TextSize = 15
 ToggleBtn.BorderSizePixel = 0
+ToggleBtn.ZIndex = 4
 ToggleBtn.Parent = BtnRow
 Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(0, 6)
 
@@ -114,64 +145,124 @@ CloseBtn.TextColor3 = Color3.fromRGB(255, 150, 180)
 CloseBtn.Font = Enum.Font.GothamBold
 CloseBtn.TextSize = 13
 CloseBtn.BorderSizePixel = 0
+CloseBtn.ZIndex = 4
 CloseBtn.Parent = BtnRow
 Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
 
 -- ================================================================
--- FLOATING QUICK-PILLS (OMAR + AIM) — mobile-safe, draggable
+-- SIDE TABS (left)
+-- ================================================================
+local TabsBar = Instance.new("Frame")
+TabsBar.Size = UDim2.new(0, 70, 1, -44)
+TabsBar.Position = UDim2.new(0, 8, 0, 40)
+TabsBar.BackgroundColor3 = Color3.fromRGB(25, 15, 35)
+TabsBar.BackgroundTransparency = 0.35
+TabsBar.BorderSizePixel = 0
+TabsBar.ZIndex = 2
+TabsBar.Parent = Main
+Instance.new("UICorner", TabsBar).CornerRadius = UDim.new(0, 6)
+
+local function makeSideTab(name, order)
+    local tab = Instance.new("TextButton")
+    tab.Size = UDim2.new(1, -6, 0, 32)
+    tab.Position = UDim2.new(0, 3, 0, 3 + (order-1) * 36)
+    tab.BackgroundColor3 = Color3.fromRGB(40, 20, 60)
+    tab.BackgroundTransparency = 0.2
+    tab.Text = name
+    tab.TextColor3 = Color3.fromRGB(220, 190, 255)
+    tab.Font = Enum.Font.GothamBold
+    tab.TextSize = 12
+    tab.BorderSizePixel = 0
+    tab.ZIndex = 3
+    tab.Parent = TabsBar
+    Instance.new("UICorner", tab).CornerRadius = UDim.new(0, 5)
+    return tab
+end
+local AimTabBtn = makeSideTab("Aimbot", 1)
+local EspTabBtn = makeSideTab("ESP", 2)
+
+local Body = Instance.new("Frame")
+Body.Size = UDim2.new(1, -96, 1, -116)
+Body.Position = UDim2.new(0, 86, 0, 76)
+Body.BackgroundTransparency = 1
+Body.ZIndex = 2
+Body.Parent = Main
+
+local AimPage = Instance.new("ScrollingFrame")
+AimPage.Size = UDim2.new(1, 0, 1, 0)
+AimPage.BackgroundTransparency = 1
+AimPage.BorderSizePixel = 0
+AimPage.ScrollBarThickness = 3
+AimPage.ScrollBarImageColor3 = Color3.fromRGB(140, 60, 220)
+AimPage.CanvasSize = UDim2.new(0, 0, 0, 300)
+AimPage.ZIndex = 3
+AimPage.Parent = Body
+
+local EspPage = Instance.new("ScrollingFrame")
+EspPage.Size = UDim2.new(1, 0, 1, 0)
+EspPage.BackgroundTransparency = 1
+EspPage.BorderSizePixel = 0
+EspPage.ScrollBarThickness = 3
+EspPage.ScrollBarImageColor3 = Color3.fromRGB(140, 60, 220)
+EspPage.CanvasSize = UDim2.new(0, 0, 0, 240)
+EspPage.Visible = false
+EspPage.ZIndex = 3
+EspPage.Parent = Body
+
+local function setActiveTab(which)
+    if which == "esp" then
+        EspPage.Visible = true; AimPage.Visible = false
+        EspTabBtn.BackgroundColor3 = Color3.fromRGB(90, 40, 140)
+        AimTabBtn.BackgroundColor3 = Color3.fromRGB(40, 20, 60)
+    else
+        EspPage.Visible = false; AimPage.Visible = true
+        EspTabBtn.BackgroundColor3 = Color3.fromRGB(40, 20, 60)
+        AimTabBtn.BackgroundColor3 = Color3.fromRGB(90, 40, 140)
+    end
+end
+setActiveTab("aim")
+track(AimTabBtn.MouseButton1Click:Connect(function() setActiveTab("aim") end))
+track(EspTabBtn.MouseButton1Click:Connect(function() setActiveTab("esp") end))
+
+-- ================================================================
+-- PILLS
 -- ================================================================
 local function makeDraggable(button, onTap)
-    local dragging  = false
-    local moved     = false
-    local dragStart = nil
-    local startPos  = nil
-
-    local function clampToViewport(pos)
+    local dragging, moved, dragStart, startPos = false, false, nil, nil
+    local function clamp(pos)
         local vp = Camera.ViewportSize
         local size = button.AbsoluteSize
         local w = size.X > 0 and size.X or button.Size.X.Offset
         local h = size.Y > 0 and size.Y or button.Size.Y.Offset
-        local x = math.clamp(pos.X.Offset, 0, vp.X - w)
-        local y = math.clamp(pos.Y.Offset, 0, vp.Y - h)
-        return UDim2.new(0, x, 0, y)
+        return UDim2.new(0, math.clamp(pos.X.Offset, 0, vp.X - w),
+                         0, math.clamp(pos.Y.Offset, 0, vp.Y - h))
     end
-
     track(button.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1
         or input.UserInputType == Enum.UserInputType.Touch then
-            dragging  = true
-            moved     = false
-            dragStart = input.Position
-            startPos  = button.Position
+            dragging, moved, dragStart, startPos = true, false, input.Position, button.Position
         end
     end))
-
     track(UserInputService.InputChanged:Connect(function(input)
         if not dragging then return end
         if input.UserInputType == Enum.UserInputType.MouseMovement
         or input.UserInputType == Enum.UserInputType.Touch then
             local d = input.Position - dragStart
             if math.abs(d.X) > 3 or math.abs(d.Y) > 3 then moved = true end
-            local newPos = UDim2.new(
-                startPos.X.Scale, startPos.X.Offset + d.X,
-                startPos.Y.Scale, startPos.Y.Offset + d.Y
-            )
-            button.Position = clampToViewport(newPos)
+            button.Position = clamp(UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X,
+                                              startPos.Y.Scale, startPos.Y.Offset + d.Y))
         end
     end))
-
     track(UserInputService.InputEnded:Connect(function(input)
         if not dragging then return end
         if input.UserInputType == Enum.UserInputType.MouseButton1
         or input.UserInputType == Enum.UserInputType.Touch then
             if not moved and onTap then onTap() end
-            dragging = false
-            moved    = false
+            dragging, moved = false, false
         end
     end))
 end
 
--- OMAR pill (opens menu)
 local FloatPill = Instance.new("TextButton")
 FloatPill.Size = UDim2.new(0, 72, 0, 28)
 FloatPill.Position = UDim2.new(0, 14, 1, -80)
@@ -191,7 +282,6 @@ local PillStroke = Instance.new("UIStroke", FloatPill)
 PillStroke.Color = Color3.fromRGB(150, 70, 220)
 PillStroke.Thickness = 1.5
 
--- AIM pill (toggles aimbot)
 local AimPill = Instance.new("TextButton")
 AimPill.Size = UDim2.new(0, 72, 0, 28)
 AimPill.Position = UDim2.new(0, 14, 1, -46)
@@ -241,9 +331,7 @@ do
     track(TitleBar.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1
         or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            dragStart = input.Position
-            startPos = Main.Position
+            dragging, dragStart, startPos = true, input.Position, Main.Position
         end
     end))
     local function move(input)
@@ -266,81 +354,17 @@ do
     end))
 end
 
--- Tabs (Aimbot first)
-local TabsBar = Instance.new("Frame")
-TabsBar.Size = UDim2.new(1, -20, 0, 30)
-TabsBar.Position = UDim2.new(0, 10, 0, 40)
-TabsBar.BackgroundColor3 = Color3.fromRGB(25, 15, 35)
-TabsBar.BorderSizePixel = 0
-TabsBar.Parent = Main
-Instance.new("UICorner", TabsBar).CornerRadius = UDim.new(0, 6)
-
-local function makeTab(name, order, total)
-    local tab = Instance.new("TextButton")
-    tab.Size = UDim2.new(1/total, -2, 1, -4)
-    tab.Position = UDim2.new((order-1)/total, 1, 0, 2)
-    tab.BackgroundColor3 = Color3.fromRGB(40, 20, 60)
-    tab.Text = name
-    tab.TextColor3 = Color3.fromRGB(220, 190, 255)
-    tab.Font = Enum.Font.GothamBold
-    tab.TextSize = 12
-    tab.BorderSizePixel = 0
-    tab.Parent = TabsBar
-    Instance.new("UICorner", tab).CornerRadius = UDim.new(0, 5)
-    return tab
-end
-local AimTabBtn = makeTab("Aimbot", 1, 2)
-local EspTabBtn = makeTab("ESP", 2, 2)
-
-local Body = Instance.new("Frame")
-Body.Size = UDim2.new(1, -20, 1, -116)
-Body.Position = UDim2.new(0, 10, 0, 76)
-Body.BackgroundTransparency = 1
-Body.Parent = Main
-
-local AimPage = Instance.new("ScrollingFrame")
-AimPage.Size = UDim2.new(1, 0, 1, 0)
-AimPage.BackgroundTransparency = 1
-AimPage.BorderSizePixel = 0
-AimPage.ScrollBarThickness = 3
-AimPage.ScrollBarImageColor3 = Color3.fromRGB(140, 60, 220)
-AimPage.CanvasSize = UDim2.new(0, 0, 0, 300)
-AimPage.Parent = Body
-
-local EspPage = Instance.new("ScrollingFrame")
-EspPage.Size = UDim2.new(1, 0, 1, 0)
-EspPage.BackgroundTransparency = 1
-EspPage.BorderSizePixel = 0
-EspPage.ScrollBarThickness = 3
-EspPage.ScrollBarImageColor3 = Color3.fromRGB(140, 60, 220)
-EspPage.CanvasSize = UDim2.new(0, 0, 0, 240)
-EspPage.Visible = false
-EspPage.Parent = Body
-
-local function setActiveTab(which)
-    if which == "esp" then
-        EspPage.Visible = true; AimPage.Visible = false
-        EspTabBtn.BackgroundColor3 = Color3.fromRGB(90, 40, 140)
-        AimTabBtn.BackgroundColor3 = Color3.fromRGB(40, 20, 60)
-    else
-        EspPage.Visible = false; AimPage.Visible = true
-        EspTabBtn.BackgroundColor3 = Color3.fromRGB(40, 20, 60)
-        AimTabBtn.BackgroundColor3 = Color3.fromRGB(90, 40, 140)
-    end
-end
-setActiveTab("aim")
-track(AimTabBtn.MouseButton1Click:Connect(function() setActiveTab("aim") end))
-track(EspTabBtn.MouseButton1Click:Connect(function() setActiveTab("esp") end))
-
 -- ============ WIDGETS ============
 local function makeToggle(parent, text, yPos, default, callback)
     local Btn = Instance.new("TextButton")
     Btn.Size = UDim2.new(1, -6, 0, 32)
     Btn.Position = UDim2.new(0, 3, 0, yPos)
     Btn.BackgroundColor3 = Color3.fromRGB(35, 20, 50)
+    Btn.BackgroundTransparency = 0.3
     Btn.Text = ""
     Btn.BorderSizePixel = 0
     Btn.AutoButtonColor = false
+    Btn.ZIndex = 3
     Btn.Parent = parent
     Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 6)
 
@@ -353,6 +377,7 @@ local function makeToggle(parent, text, yPos, default, callback)
     Lbl.Font = Enum.Font.Gotham
     Lbl.TextSize = 13
     Lbl.TextXAlignment = Enum.TextXAlignment.Left
+    Lbl.ZIndex = 4
     Lbl.Parent = Btn
 
     local Pill = Instance.new("Frame")
@@ -360,6 +385,7 @@ local function makeToggle(parent, text, yPos, default, callback)
     Pill.Position = UDim2.new(1, -50, 0.5, -10)
     Pill.BackgroundColor3 = default and Color3.fromRGB(150, 70, 220) or Color3.fromRGB(60, 40, 80)
     Pill.BorderSizePixel = 0
+    Pill.ZIndex = 4
     Pill.Parent = Btn
     Instance.new("UICorner", Pill).CornerRadius = UDim.new(1, 0)
 
@@ -368,6 +394,7 @@ local function makeToggle(parent, text, yPos, default, callback)
     Knob.Position = default and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
     Knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     Knob.BorderSizePixel = 0
+    Knob.ZIndex = 5
     Knob.Parent = Pill
     Instance.new("UICorner", Knob).CornerRadius = UDim.new(1, 0)
 
@@ -386,26 +413,30 @@ local function makeSwitch(parent, text, yPos, options, default, callback)
     Frame.Size = UDim2.new(1, -6, 0, 32)
     Frame.Position = UDim2.new(0, 3, 0, yPos)
     Frame.BackgroundColor3 = Color3.fromRGB(35, 20, 50)
+    Frame.BackgroundTransparency = 0.3
     Frame.BorderSizePixel = 0
+    Frame.ZIndex = 3
     Frame.Parent = parent
     Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 6)
 
     local Lbl = Instance.new("TextLabel")
-    Lbl.Size = UDim2.new(0, 90, 1, 0)
-    Lbl.Position = UDim2.new(0, 12, 0, 0)
+    Lbl.Size = UDim2.new(0, 80, 1, 0)
+    Lbl.Position = UDim2.new(0, 10, 0, 0)
     Lbl.BackgroundTransparency = 1
     Lbl.Text = text
     Lbl.TextColor3 = Color3.fromRGB(230, 200, 255)
     Lbl.Font = Enum.Font.Gotham
-    Lbl.TextSize = 13
+    Lbl.TextSize = 12
     Lbl.TextXAlignment = Enum.TextXAlignment.Left
+    Lbl.ZIndex = 4
     Lbl.Parent = Frame
 
     local Container = Instance.new("Frame")
-    Container.Size = UDim2.new(0, 120, 0, 22)
-    Container.Position = UDim2.new(1, -128, 0.5, -11)
+    Container.Size = UDim2.new(0, 108, 0, 22)
+    Container.Position = UDim2.new(1, -116, 0.5, -11)
     Container.BackgroundColor3 = Color3.fromRGB(20, 12, 30)
     Container.BorderSizePixel = 0
+    Container.ZIndex = 4
     Container.Parent = Frame
     Instance.new("UICorner", Container).CornerRadius = UDim.new(0, 5)
 
@@ -417,8 +448,9 @@ local function makeSwitch(parent, text, yPos, options, default, callback)
         b.Text = opt
         b.TextColor3 = Color3.fromRGB(240, 220, 255)
         b.Font = Enum.Font.GothamBold
-        b.TextSize = 11
+        b.TextSize = 10
         b.BorderSizePixel = 0
+        b.ZIndex = 5
         b.Parent = Container
         Instance.new("UICorner", b).CornerRadius = UDim.new(0, 4)
         track(b.MouseButton1Click:Connect(function()
@@ -439,6 +471,7 @@ local function makeSlider(parent, text, yPos, min, max, default, callback)
     Frame.Size = UDim2.new(1, -6, 0, 44)
     Frame.Position = UDim2.new(0, 3, 0, yPos)
     Frame.BackgroundTransparency = 1
+    Frame.ZIndex = 3
     Frame.Parent = parent
 
     local Lbl = Instance.new("TextLabel")
@@ -449,13 +482,16 @@ local function makeSlider(parent, text, yPos, min, max, default, callback)
     Lbl.Font = Enum.Font.Gotham
     Lbl.TextSize = 12
     Lbl.TextXAlignment = Enum.TextXAlignment.Left
+    Lbl.ZIndex = 4
     Lbl.Parent = Frame
 
     local Bar = Instance.new("Frame")
     Bar.Size = UDim2.new(1, 0, 0, 14)
     Bar.Position = UDim2.new(0, 0, 0, 22)
     Bar.BackgroundColor3 = Color3.fromRGB(35, 20, 50)
+    Bar.BackgroundTransparency = 0.3
     Bar.BorderSizePixel = 0
+    Bar.ZIndex = 4
     Bar.Parent = Frame
     Instance.new("UICorner", Bar).CornerRadius = UDim.new(0, 7)
 
@@ -463,6 +499,7 @@ local function makeSlider(parent, text, yPos, min, max, default, callback)
     Fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
     Fill.BackgroundColor3 = Color3.fromRGB(150, 70, 220)
     Fill.BorderSizePixel = 0
+    Fill.ZIndex = 5
     Fill.Parent = Bar
     Instance.new("UICorner", Fill).CornerRadius = UDim.new(0, 7)
 
@@ -520,9 +557,10 @@ Credit.Text = "Made by Omar"
 Credit.TextColor3 = Color3.fromRGB(180, 100, 240)
 Credit.Font = Enum.Font.GothamBold
 Credit.TextSize = 12
+Credit.ZIndex = 3
 Credit.Parent = Main
 
--- FOV RING
+-- ============ FOV RING ============
 local FovRing = Instance.new("Frame")
 FovRing.AnchorPoint = Vector2.new(0.5, 0.5)
 FovRing.BackgroundTransparency = 1
@@ -562,7 +600,6 @@ local CenterStroke = Instance.new("UIStroke", CenterDot)
 CenterStroke.Color = Color3.fromRGB(90, 40, 140)
 CenterStroke.Thickness = 1
 
--- Target dots (Drawing)
 local TargetDot = Drawing.new("Circle")
 TargetDot.Thickness = 2
 TargetDot.Color = Color3.fromRGB(255, 80, 255)
@@ -587,7 +624,23 @@ local function isTeammate(player)
     return a == b
 end
 
-local function isAliveHumanoid(hum) return hum and hum.Health > 0 end
+-- Strict alive check (excludes corpses)
+local function isAliveHumanoid(hum)
+    if not hum then return false end
+    if hum.Health <= 0 then return false end
+    if hum:GetState() == Enum.HumanoidStateType.Dead then return false end
+    local parent = hum.Parent
+    if parent then
+        local torso = parent:FindFirstChild("Torso")
+            or parent:FindFirstChild("UpperTorso")
+            or parent:FindFirstChild("HumanoidRootPart")
+        if torso and torso:IsA("BasePart") then
+            local look = torso.CFrame.LookVector
+            if math.abs(look.Y) > 0.75 then return false end
+        end
+    end
+    return true
+end
 
 local function hasValidRig(model)
     if not model or not model.Parent then return false end
@@ -639,6 +692,7 @@ local function refreshNpcCache()
     for _, hum in ipairs(Workspace:GetDescendants()) do
         if not hum:IsA("Humanoid") then continue end
         if hum.Health <= 0 then continue end
+        if hum:GetState() == Enum.HumanoidStateType.Dead then continue end
         local model = hum.Parent
         if not model or not model:IsA("Model") then continue end
         if model == localChar then continue end
@@ -829,7 +883,7 @@ local function findBestTarget()
 
     for _, t in ipairs(getPlayerTargets()) do
         local part = getTargetPart(t.character)
-        if part then
+        if part and isAliveHumanoid(t.humanoid) then
             local dist = (origin - part.Position).Magnitude
             if dist <= Config.Aimbot.MaxDist then
                 local sp, on = Camera:WorldToViewportPoint(part.Position)
@@ -846,7 +900,7 @@ local function findBestTarget()
 
     for _, t in ipairs(getNpcTargets()) do
         local part = getTargetPart(t.character)
-        if part then
+        if part and isAliveHumanoid(t.humanoid) then
             local dist = (origin - part.Position).Magnitude
             if dist <= Config.Aimbot.MaxDist then
                 local sp, on = Camera:WorldToViewportPoint(part.Position)
@@ -871,7 +925,8 @@ local function targetIsValid(part)
     if not part:IsDescendantOf(Workspace) then return false end
     local char = part.Parent
     local hum = char and char:FindFirstChildOfClass("Humanoid")
-    return hum and hum.Health > 0
+    if not isAliveHumanoid(hum) then return false end
+    return true
 end
 
 local function aimStep()
