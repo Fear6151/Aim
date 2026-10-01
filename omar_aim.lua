@@ -1,7 +1,7 @@
 --[[
     Omar Hub
     Credit: Made by Omar
-   
+    
 --]]
 
 local Players          = game:GetService("Players")
@@ -270,7 +270,6 @@ do
     end))
 end
 
--- LEFT RAIL TABS
 local TabsRail = Instance.new("Frame")
 TabsRail.Size = UDim2.new(0, 80, 1, -46)
 TabsRail.Position = UDim2.new(0, 6, 0, 40)
@@ -641,13 +640,22 @@ local function isTeammate(plr)
     return false
 end
 
--- STRICT alive check — must be alive AND still parented to game.Workspace
+-- STRICT alive check for characters
+-- Returns the humanoid only if:
+--   • parented to workspace
+--   • has a humanoid
+--   • humanoid.Health > 0
+--   • humanoid is NOT in the Dead state (catches ragdolls)
 local function getAliveHumanoid(char)
     if not char then return nil end
     if not char.Parent then return nil end
+    if not char:IsDescendantOf(Workspace) then return nil end
     local hum = char:FindFirstChildOfClass("Humanoid")
     if not hum then return nil end
     if hum.Health <= 0 then return nil end
+    -- Ragdoll / death state check
+    local ok, state = pcall(function() return hum:GetState() end)
+    if ok and state == Enum.HumanoidStateType.Dead then return nil end
     return hum
 end
 
@@ -658,17 +666,35 @@ local function hasValidRig(model)
     return head and head:IsA("BasePart") and hrp and hrp:IsA("BasePart")
 end
 
+-- ============ STRICT TARGET PART LOOKUP ============
+-- Torso mode: refuses to fall back to HumanoidRootPart when the character
+-- is dead or dying (that's the path that was locking onto dead bodies).
 local function getTargetPart(char)
     if not hasValidRig(char) then return nil end
+
+    -- Require a live humanoid for BOTH head and torso
+    local hum = getAliveHumanoid(char)
+    if not hum then return nil end
+
     if Config.Aimbot.TargetPart == "Head" then
         local h = char:FindFirstChild("Head")
         if h and h:IsA("BasePart") then return h end
         return nil
     end
-    local upper = char:FindFirstChild("UpperTorso"); if upper and upper:IsA("BasePart") then return upper end
-    local torso = char:FindFirstChild("Torso");      if torso and torso:IsA("BasePart") then return torso end
-    local lower = char:FindFirstChild("LowerTorso"); if lower and lower:IsA("BasePart") then return lower end
-    local hrp   = char:FindFirstChild("HumanoidRootPart"); if hrp and hrp:IsA("BasePart") then return hrp end
+
+    -- Torso mode: prefer UpperTorso → Torso → LowerTorso.
+    -- NO HumanoidRootPart fallback for dead bodies — the humanoid check above
+    -- already rejects them, but this is belt-and-suspenders.
+    local upper = char:FindFirstChild("UpperTorso")
+    if upper and upper:IsA("BasePart") then return upper end
+    local torso = char:FindFirstChild("Torso")
+    if torso and torso:IsA("BasePart") then return torso end
+    local lower = char:FindFirstChild("LowerTorso")
+    if lower and lower:IsA("BasePart") then return lower end
+
+    -- Last resort: HRP — but only if humanoid is confirmed alive above
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if hrp and hrp:IsA("BasePart") then return hrp end
     return nil
 end
 
@@ -713,6 +739,8 @@ local function refreshNpcCache()
     for _, hum in ipairs(Workspace:GetDescendants()) do
         if not hum:IsA("Humanoid") then continue end
         if hum.Health <= 0 then continue end
+        local ok, state = pcall(function() return hum:GetState() end)
+        if ok and state == Enum.HumanoidStateType.Dead then continue end
         local model = hum.Parent
         if not model or not model:IsA("Model") then continue end
         if model == localChar then continue end
@@ -942,20 +970,19 @@ end
 local AIMBOT_BIND_NAME = "OmarHubAimbot"
 local bound = false
 local currentTarget = nil
-local reacquireAt = 0  -- cooldown after dropping a target
+local reacquireAt = 0
 
--- STRICT target validity: must be alive, must still be parented,
--- must be descendant of Workspace, must pass team + LOS checks
 local function targetIsValid(part)
     if not part then return false end
     if not part.Parent then return false end
     if not part:IsDescendantOf(Workspace) then return false end
     local char = part.Parent
-    -- Character must still have a Humanoid that's alive
-    local hum = char:FindFirstChildOfClass("Humanoid")
+    -- STRICT: check the character itself is still in workspace
+    if not char:IsDescendantOf(Workspace) then return false end
+    -- STRICT: humanoid must be alive AND not in Dead state
+    local hum = getAliveHumanoid(char)
     if not hum then return false end
-    if hum.Health <= 0 then return false end
-    -- Character must still be the player's CurrentCharacter (for players)
+    -- Respawn safety: for players, ensure this is still their current character
     local plr = Players:GetPlayerFromCharacter(char)
     if plr and plr.Character ~= char then return false end
     if Config.Aimbot.TeamCheck and plr and isTeammate(plr) then return false end
@@ -963,14 +990,12 @@ local function targetIsValid(part)
     return true
 end
 
--- Restore auto-rotate for the local character
 local function restoreAutoRotate()
     local char = LocalPlayer.Character
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     if hum and not hum.AutoRotate then hum.AutoRotate = true end
 end
 
--- Disable auto-rotate while we lock hard
 local function lockAutoRotate()
     local char = LocalPlayer.Character
     local hum = char and char:FindFirstChildOfClass("Humanoid")
@@ -999,20 +1024,17 @@ local function aimStep()
 
     local gated = (Config.Aimbot.LockMode == "Hold Mouse") and not mouseHeld
 
-    -- Step 1: check current target validity
     if currentTarget and not targetIsValid(currentTarget) then
         currentTarget = nil
-        reacquireAt = tick() + 0.15  -- brief cooldown before re-acquiring
-        restoreAutoRotate()          -- don't stay frozen while re-acquiring
+        reacquireAt = tick() + 0.15
+        restoreAutoRotate()
     end
 
-    -- Step 2: if we have a target, do a HARD FOV check (no tolerance multiplier)
     if currentTarget then
         local sp, on = Camera:WorldToViewportPoint(currentTarget.Position)
         local vp = Camera.ViewportSize
         local center = Vector2.new(vp.X / 2, vp.Y / 2)
         local screenDist = on and (Vector2.new(sp.X, sp.Y) - center).Magnitude or math.huge
-        -- If the target is off-screen or outside the FOV, drop it immediately
         if not on or sp.Z <= 0 or screenDist > Config.Aimbot.FOV then
             currentTarget = nil
             reacquireAt = tick() + 0.15
@@ -1020,12 +1042,10 @@ local function aimStep()
         end
     end
 
-    -- Step 3: acquire a new target only if we're past the cooldown
     if not currentTarget and tick() >= reacquireAt then
         currentTarget = findBestTarget()
     end
 
-    -- Step 4: draw the target dot (only if we have a valid target in front of us)
     if currentTarget and targetIsValid(currentTarget) then
         local sp, on = Camera:WorldToViewportPoint(currentTarget.Position)
         if on and sp.Z > 0 then
@@ -1042,13 +1062,11 @@ local function aimStep()
         TargetDotInner.Visible = false
     end
 
-    -- Step 5: gated (Hold Mouse, not firing) — don't move the camera at all
     if gated or not currentTarget then
         restoreAutoRotate()
         return
     end
 
-    -- Step 6: apply camera lock
     local aimPos = currentTarget.Position
     local alpha = math.clamp(Config.Aimbot.Smoothness / 100, 0.01, 1)
 
@@ -1056,7 +1074,6 @@ local function aimStep()
     local desiredCF = CFrame.new(curCF.Position, aimPos)
     Camera.CFrame = curCF:Lerp(desiredCF, alpha)
 
-    -- Step 7: character rotation lock (only when locking hard)
     if alpha >= 0.4 then
         lockAutoRotate()
         local char = LocalPlayer.Character
@@ -1068,7 +1085,6 @@ local function aimStep()
             hrp.CFrame = curHRP:Lerp(desiredHRP, alpha)
         end
     else
-        -- soft lock → don't freeze character rotation
         restoreAutoRotate()
     end
 end
@@ -1104,7 +1120,6 @@ track(RunService.Heartbeat:Connect(function()
     end
 end))
 
--- Watchdog: make sure auto-rotate is never permanently stuck off
 track(RunService.Stepped:Connect(function()
     if Config.Aimbot.Enabled and currentTarget then return end
     restoreAutoRotate()
