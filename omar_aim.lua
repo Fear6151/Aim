@@ -1,7 +1,7 @@
 --[[
     Omar Hub
     Credit: Made by Omar
-
+    
 --]]
 
 local Players          = game:GetService("Players")
@@ -640,12 +640,56 @@ local function isTeammate(plr)
     return false
 end
 
--- ============ MOVEMENT TRACKER (dead body detector) ============
--- A living player always jitters slightly. A corpse is perfectly still.
--- We track the last-known position + timestamp per character. If the
--- position hasn't changed by more than 0.05 studs in the last 0.5s, it's
--- treated as dead.
-local moveTracker = {}   -- [character] = { lastPos = Vector3, lastChangeTime = tick() }
+-- ============ BULLETPROOF ALIVE CHECK ============
+--[[
+    A character is "alive and targetable" ONLY IF ALL of these are true:
+      1. char.Parent is a valid container (Workspace or a Folder in Workspace)
+      2. char is a descendant of Workspace (still in the game world)
+      3. It has a Humanoid
+      4. Humanoid.Health > 0
+      5. Humanoid is NOT in Dead state
+      6. Humanoid is NOT in FallingDown state (ragdoll corpse)
+      7. Humanoid.RootPart is still parented (dead bodies lose this)
+      8. If it's a player's character, that player's CurrentCharacter is THIS char
+         (rules out "old body" after respawn)
+]]
+local function isAliveAndActive(char, requireMovement)
+    if not char then return false end
+    if not char.Parent then return false end
+    if not char:IsDescendantOf(Workspace) then return false end
+
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum then return false end
+    if hum.Health <= 0 then return false end
+
+    -- GetState: catches ragdoll corpses that still have Health > 0
+    local ok, state = pcall(function() return hum:GetState() end)
+    if ok then
+        if state == Enum.HumanoidStateType.Dead then return false end
+        if state == Enum.HumanoidStateType.FallingDown then return false end
+    end
+
+    -- RootPart must still be present (dead bodies often lose it or move it out)
+    if not hum.RootPart then return false end
+    if not hum.RootPart.Parent then return false end
+
+    -- If this is a player's character, ensure it's still their CURRENT character
+    local plr = Players:GetPlayerFromCharacter(char)
+    if plr then
+        if plr.Character ~= char then return false end
+        -- Also confirm the humanoid is the current one
+        local curHum = char:FindFirstChildOfClass("Humanoid")
+        if curHum ~= hum then return false end
+    end
+
+    -- Movement check (skip if caller doesn't need it)
+    if requireMovement and not isMoving(char) then return false end
+
+    return true
+end
+
+-- ============ MOVEMENT TRACKER ============
+local moveTracker = {}
 
 track(RunService.Heartbeat:Connect(function()
     for char, data in pairs(moveTracker) do
@@ -664,31 +708,15 @@ track(RunService.Heartbeat:Connect(function()
     end
 end))
 
-local function isMoving(char)
+function isMoving(char)
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
     if not hrp then return false end
     local data = moveTracker[char]
     if not data then
         moveTracker[char] = { lastPos = hrp.Position, lastChangeTime = tick() }
-        return true  -- assume moving on first frame
+        return true
     end
-    -- Moving within the last 0.5s means alive
     return (tick() - data.lastChangeTime) < 0.5
-end
-
--- STRICT alive check for characters
-local function getAliveHumanoid(char, requireMovement)
-    if not char then return nil end
-    if not char.Parent then return nil end
-    if not char:IsDescendantOf(Workspace) then return nil end
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    if not hum then return nil end
-    if hum.Health <= 0 then return nil end
-    local ok, state = pcall(function() return hum:GetState() end)
-    if ok and state == Enum.HumanoidStateType.Dead then return nil end
-    -- Movement check (dead bodies don't move)
-    if requireMovement and not isMoving(char) then return nil end
-    return hum
 end
 
 local function hasValidRig(model)
@@ -699,28 +727,23 @@ local function hasValidRig(model)
 end
 
 -- ============ STRICT TARGET PART LOOKUP ============
--- When Head is selected, ONLY Head is ever returned. No HRP fallback.
--- When Torso is selected, torso parts only. No HRP fallback for alive.
 local function getTargetPart(char)
     if not hasValidRig(char) then return nil end
-    -- Require alive humanoid AND recent movement
-    local hum = getAliveHumanoid(char, true)
-    if not hum then return nil end
+    if not isAliveAndActive(char, true) then return nil end
 
     if Config.Aimbot.TargetPart == "Head" then
         local h = char:FindFirstChild("Head")
         if h and h:IsA("BasePart") then return h end
-        return nil  -- NO fallback
+        return nil
     end
 
-    -- Torso mode
     local upper = char:FindFirstChild("UpperTorso")
     if upper and upper:IsA("BasePart") then return upper end
     local torso = char:FindFirstChild("Torso")
     if torso and torso:IsA("BasePart") then return torso end
     local lower = char:FindFirstChild("LowerTorso")
     if lower and lower:IsA("BasePart") then return lower end
-    return nil  -- NO HRP fallback
+    return nil
 end
 
 local function hasLineOfSight(targetPart)
@@ -741,12 +764,12 @@ local function getPlayerTargets(useTeamCheck)
     for _, player in ipairs(Players:GetPlayers()) do
         if player == LocalPlayer then continue end
         local char = player.Character
-        local hum = getAliveHumanoid(char, true)
-        if not hum then continue end
+        if not isAliveAndActive(char, true) then continue end
         if useTeamCheck and isTeammate(player) then continue end
         if not hasValidRig(char) then continue end
         out[#out + 1] = {
-            character = char, humanoid = hum, player = player,
+            character = char, humanoid = char:FindFirstChildOfClass("Humanoid"),
+            player = player,
             name = (player.DisplayName ~= "" and player.DisplayName) or player.Name,
             isNpc = false,
         }
@@ -774,6 +797,7 @@ local function refreshNpcCache()
         local head = model:FindFirstChild("Head")
         local hrp  = model:FindFirstChild("HumanoidRootPart")
         if (head.Position - hrp.Position).Magnitude > 8 then continue end
+        if not isAliveAndActive(model, true) then continue end
         out[#out + 1] = model
     end
     npcCache = out
@@ -783,8 +807,8 @@ local function getNpcTargets()
     local out = {}
     for _, model in ipairs(npcCache) do
         if not model.Parent then continue end
-        local hum = getAliveHumanoid(model, true)
-        if not hum then continue end
+        local hum = model:FindFirstChildOfClass("Humanoid")
+        if not hum or hum.Health <= 0 then continue end
         if not hasValidRig(model) then continue end
         out[#out + 1] = {
             character = model, humanoid = hum, player = nil,
@@ -866,7 +890,8 @@ local function drawESP(t)
     local char = t.character
     if not espObjects[char] then createESP(char) end
     local d = espObjects[char]
-    local hum = getAliveHumanoid(char, false)  -- ESP doesn't require movement
+    if not isAliveAndActive(char, false) then setAllVisible(d, false); return end
+    local hum  = char:FindFirstChildOfClass("Humanoid")
     local hrp  = char:FindFirstChild("HumanoidRootPart")
     local head = char:FindFirstChild("Head")
     if not (hum and hrp and head) then setAllVisible(d, false); return end
@@ -1002,14 +1027,13 @@ local function targetIsValid(part)
     if not part.Parent then return false end
     if not part:IsDescendantOf(Workspace) then return false end
     local char = part.Parent
-    if not char:IsDescendantOf(Workspace) then return false end
-    -- STRICT: humanoid alive + not dead state + recent movement
-    local hum = getAliveHumanoid(char, true)
+    if not isAliveAndActive(char, true) then return false end
+    local hum = char:FindFirstChildOfClass("Humanoid")
     if not hum then return false end
     local plr = Players:GetPlayerFromCharacter(char)
     if plr and plr.Character ~= char then return false end
     if Config.Aimbot.TeamCheck and plr and isTeammate(plr) then return false end
-    -- Confirm the part we're aiming at is the CORRECT part for the setting
+    -- Must still be the exact expected part
     local expectedPart = getTargetPart(char)
     if expectedPart ~= part then return false end
     if not hasLineOfSight(part) then return false end
