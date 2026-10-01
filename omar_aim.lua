@@ -1,7 +1,7 @@
 --[[
     Omar Hub
     Credit: Made by Omar
-    
+   
 --]]
 
 local Players          = game:GetService("Players")
@@ -36,25 +36,6 @@ local Config = {
 
 local connections = {}
 local function track(c) table.insert(connections, c); return c end
-
--- ============ DEBUG: show team info on start ============
-task.spawn(function()
-    task.wait(2)
-    print("======== [OmarHub] Team Debug ========")
-    print("LocalPlayer.Team:", tostring(LocalPlayer.Team))
-    print("LocalPlayer.TeamColor:", tostring(LocalPlayer.TeamColor))
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer then
-            print(string.format("  Player %s | Team=%s | TeamColor=%s | Attr Team=%s",
-                p.Name,
-                tostring(p.Team),
-                tostring(p.TeamColor),
-                tostring(p:GetAttribute("Team"))
-            ))
-        end
-    end
-    print("======================================")
-end)
 
 -- ============ UI ============
 local ScreenGui = Instance.new("ScreenGui")
@@ -140,7 +121,6 @@ BtnRow.Parent = TitleBar
 local ToggleBtn = Instance.new("TextButton")
 ToggleBtn.Size = UDim2.new(0, 24, 0, 24)
 ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 25, 70)
-ToggleBtn.BackgroundTransparency = 0
 ToggleBtn.Text = "–"
 ToggleBtn.TextColor3 = Color3.fromRGB(220, 180, 255)
 ToggleBtn.Font = Enum.Font.GothamBold
@@ -154,7 +134,6 @@ local CloseBtn = Instance.new("TextButton")
 CloseBtn.Size = UDim2.new(0, 24, 0, 24)
 CloseBtn.Position = UDim2.new(0, 30, 0, 0)
 CloseBtn.BackgroundColor3 = Color3.fromRGB(70, 20, 40)
-CloseBtn.BackgroundTransparency = 0
 CloseBtn.Text = "X"
 CloseBtn.TextColor3 = Color3.fromRGB(255, 150, 180)
 CloseBtn.Font = Enum.Font.GothamBold
@@ -625,45 +604,26 @@ TargetDotInner.Radius = 4
 TargetDotInner.Transparency = 1
 TargetDotInner.Visible = false
 
--- ============ HARD TEAM CHECK (multi-source) ============
---[[
-    Different games store teams differently:
-      • player.Team            (standard Roblox teams)
-      • player.TeamColor       (color-only teams)
-      • player:GetAttribute("Team")  (attribute-based teams)
-      • player.TeamName.Value  (custom StringValue inside Player)
-      • ReplicatedStorage / Teams folder (custom team system)
-
-    We check as many as possible so if ANY indicates a match → teammate.
-]]
+-- ============ HARD TEAM CHECK ============
 local function getTeamSignature(plr)
     if not plr then return nil end
     local sigs = {}
-
-    -- Standard Roblox Team object
     if plr.Team ~= nil then
         sigs[#sigs + 1] = "Team:" .. tostring(plr.Team)
     end
-
-    -- TeamColor (some games use this without a Team object)
     if plr.TeamColor ~= nil and plr.TeamColor ~= BrickColor.new("Medium stone grey") then
         sigs[#sigs + 1] = "Color:" .. tostring(plr.TeamColor)
     end
-
-    -- Attribute "Team"
     local attrTeam = plr:GetAttribute("Team")
     if attrTeam ~= nil then
         sigs[#sigs + 1] = "Attr:" .. tostring(attrTeam)
     end
-
-    -- Child Value/StringValue named "Team" or "TeamName"
     for _, childName in ipairs({"Team", "TeamName"}) do
         local c = plr:FindFirstChild(childName)
         if c and c:IsA("ValueBase") then
             sigs[#sigs + 1] = childName .. ":" .. tostring(c.Value)
         end
     end
-
     if #sigs == 0 then return nil end
     return table.concat(sigs, "|")
 end
@@ -673,7 +633,6 @@ local function isTeammate(plr)
     local mySig = getTeamSignature(LocalPlayer)
     local theirSig = getTeamSignature(plr)
     if not mySig or not theirSig then return false end
-    -- Any shared identifier → teammate
     for _, my in ipairs(string.split(mySig, "|")) do
         for _, their in ipairs(string.split(theirSig, "|")) do
             if my == their then return true end
@@ -682,10 +641,13 @@ local function isTeammate(plr)
     return false
 end
 
+-- STRICT alive check — must be alive AND still parented to game.Workspace
 local function getAliveHumanoid(char)
-    if not char or not char.Parent then return nil end
+    if not char then return nil end
+    if not char.Parent then return nil end
     local hum = char:FindFirstChildOfClass("Humanoid")
-    if not hum or hum.Health <= 0 then return nil end
+    if not hum then return nil end
+    if hum.Health <= 0 then return nil end
     return hum
 end
 
@@ -728,7 +690,6 @@ local function getPlayerTargets(useTeamCheck)
     for _, player in ipairs(Players:GetPlayers()) do
         if player == LocalPlayer then continue end
         local char = player.Character
-        if not char or not char.Parent then continue end
         local hum = getAliveHumanoid(char)
         if not hum then continue end
         if useTeamCheck and isTeammate(player) then continue end
@@ -981,19 +942,39 @@ end
 local AIMBOT_BIND_NAME = "OmarHubAimbot"
 local bound = false
 local currentTarget = nil
+local reacquireAt = 0  -- cooldown after dropping a target
 
+-- STRICT target validity: must be alive, must still be parented,
+-- must be descendant of Workspace, must pass team + LOS checks
 local function targetIsValid(part)
-    if not part or not part.Parent then return false end
+    if not part then return false end
+    if not part.Parent then return false end
     if not part:IsDescendantOf(Workspace) then return false end
     local char = part.Parent
-    local hum = getAliveHumanoid(char)
+    -- Character must still have a Humanoid that's alive
+    local hum = char:FindFirstChildOfClass("Humanoid")
     if not hum then return false end
-    if Config.Aimbot.TeamCheck then
-        local plr = Players:GetPlayerFromCharacter(char)
-        if plr and isTeammate(plr) then return false end
-    end
+    if hum.Health <= 0 then return false end
+    -- Character must still be the player's CurrentCharacter (for players)
+    local plr = Players:GetPlayerFromCharacter(char)
+    if plr and plr.Character ~= char then return false end
+    if Config.Aimbot.TeamCheck and plr and isTeammate(plr) then return false end
     if not hasLineOfSight(part) then return false end
     return true
+end
+
+-- Restore auto-rotate for the local character
+local function restoreAutoRotate()
+    local char = LocalPlayer.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if hum and not hum.AutoRotate then hum.AutoRotate = true end
+end
+
+-- Disable auto-rotate while we lock hard
+local function lockAutoRotate()
+    local char = LocalPlayer.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if hum then hum.AutoRotate = false end
 end
 
 local function aimStep()
@@ -1012,29 +993,40 @@ local function aimStep()
         CenterDot.Visible = false
         TargetDot.Visible = false
         TargetDotInner.Visible = false
+        restoreAutoRotate()
         return
     end
 
     local gated = (Config.Aimbot.LockMode == "Hold Mouse") and not mouseHeld
 
-    if not targetIsValid(currentTarget) then
+    -- Step 1: check current target validity
+    if currentTarget and not targetIsValid(currentTarget) then
         currentTarget = nil
+        reacquireAt = tick() + 0.15  -- brief cooldown before re-acquiring
+        restoreAutoRotate()          -- don't stay frozen while re-acquiring
     end
 
+    -- Step 2: if we have a target, do a HARD FOV check (no tolerance multiplier)
     if currentTarget then
         local sp, on = Camera:WorldToViewportPoint(currentTarget.Position)
         local vp = Camera.ViewportSize
         local center = Vector2.new(vp.X / 2, vp.Y / 2)
-        if not on or (Vector2.new(sp.X, sp.Y) - center).Magnitude > Config.Aimbot.FOV * 1.2 then
+        local screenDist = on and (Vector2.new(sp.X, sp.Y) - center).Magnitude or math.huge
+        -- If the target is off-screen or outside the FOV, drop it immediately
+        if not on or sp.Z <= 0 or screenDist > Config.Aimbot.FOV then
             currentTarget = nil
+            reacquireAt = tick() + 0.15
+            restoreAutoRotate()
         end
     end
 
-    if not currentTarget then
+    -- Step 3: acquire a new target only if we're past the cooldown
+    if not currentTarget and tick() >= reacquireAt then
         currentTarget = findBestTarget()
     end
 
-    if currentTarget then
+    -- Step 4: draw the target dot (only if we have a valid target in front of us)
+    if currentTarget and targetIsValid(currentTarget) then
         local sp, on = Camera:WorldToViewportPoint(currentTarget.Position)
         if on and sp.Z > 0 then
             TargetDot.Visible = true
@@ -1050,8 +1042,13 @@ local function aimStep()
         TargetDotInner.Visible = false
     end
 
-    if gated or not currentTarget then return end
+    -- Step 5: gated (Hold Mouse, not firing) — don't move the camera at all
+    if gated or not currentTarget then
+        restoreAutoRotate()
+        return
+    end
 
+    -- Step 6: apply camera lock
     local aimPos = currentTarget.Position
     local alpha = math.clamp(Config.Aimbot.Smoothness / 100, 0.01, 1)
 
@@ -1059,17 +1056,20 @@ local function aimStep()
     local desiredCF = CFrame.new(curCF.Position, aimPos)
     Camera.CFrame = curCF:Lerp(desiredCF, alpha)
 
+    -- Step 7: character rotation lock (only when locking hard)
     if alpha >= 0.4 then
+        lockAutoRotate()
         local char = LocalPlayer.Character
         local hrp  = char and char:FindFirstChild("HumanoidRootPart")
-        local hum  = char and char:FindFirstChildOfClass("Humanoid")
-        if hrp and hum then
-            hum.AutoRotate = false
+        if hrp then
             local flat = Vector3.new(aimPos.X, hrp.Position.Y, aimPos.Z)
             local curHRP = hrp.CFrame
             local desiredHRP = CFrame.new(curHRP.Position, flat)
             hrp.CFrame = curHRP:Lerp(desiredHRP, alpha)
         end
+    else
+        -- soft lock → don't freeze character rotation
+        restoreAutoRotate()
     end
 end
 
@@ -1081,6 +1081,7 @@ local function refreshBinding()
         end
     else
         currentTarget = nil
+        reacquireAt = 0
         TargetDot.Visible = false
         TargetDotInner.Visible = false
         FovRing.Visible = false
@@ -1090,9 +1091,7 @@ local function refreshBinding()
             pcall(function() RunService:UnbindFromRenderStep(AIMBOT_BIND_NAME) end)
             bound = false
         end
-        local char = LocalPlayer.Character
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-        if hum then hum.AutoRotate = true end
+        restoreAutoRotate()
     end
 end
 
@@ -1105,18 +1104,16 @@ track(RunService.Heartbeat:Connect(function()
     end
 end))
 
+-- Watchdog: make sure auto-rotate is never permanently stuck off
 track(RunService.Stepped:Connect(function()
-    if Config.Aimbot.Enabled then return end
-    local char = LocalPlayer.Character
-    local hum = char and char:FindFirstChildOfClass("Humanoid")
-    if hum and not hum.AutoRotate then hum.AutoRotate = true end
+    if Config.Aimbot.Enabled and currentTarget then return end
+    restoreAutoRotate()
 end))
 
 track(LocalPlayer.CharacterAdded:Connect(function()
     task.wait(0.2)
-    if not Config.Aimbot.Enabled then
-        local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-        if hum then hum.AutoRotate = true end
+    if not Config.Aimbot.Enabled or not currentTarget then
+        restoreAutoRotate()
     end
 end))
 
@@ -1160,9 +1157,7 @@ end))
 local function shutdown()
     pcall(function() RunService:UnbindFromRenderStep(AIMBOT_BIND_NAME) end)
     bound = false
-    local char = LocalPlayer.Character
-    local hum = char and char:FindFirstChildOfClass("Humanoid")
-    if hum then hum.AutoRotate = true end
+    restoreAutoRotate()
     for _, d in pairs(espObjects) do
         for _, obj in pairs(d) do pcall(function() obj:Remove() end) end
     end
